@@ -1,4 +1,6 @@
-{
+git remote add origin <YOUR-REMOTE-URL>
+git branch -M main           # optional: rename current branch to main
+git push -u origin main{
   "manifest_version": 3,
   "name": "Universal AI Website Assistant",
   "description": "Generic AI agent that understands website structure and context",
