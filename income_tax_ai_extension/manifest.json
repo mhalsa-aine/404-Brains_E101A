@@ -1,11 +1,19 @@
 {
   "manifest_version": 3,
-  "name": "Income Tax AI",
+  "name": "Universal AI Website Assistant",
+  "description": "Generic AI agent that understands website structure and context",
   "version": "1.0",
-  "description": "Get instant AI guidance on income tax",
-  "action": {
-    "default_popup": "popup.html"
-  },
-  "permissions": ["activeTab"]
-}
 
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
