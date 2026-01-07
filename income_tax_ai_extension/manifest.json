@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Income Tax AI",
+  "version": "1.0",
+  "description": "Get instant AI guidance on income tax",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "permissions": ["activeTab"]
+}
+
