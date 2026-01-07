@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Universal AI Website Assistant",
+  "version": "1.0",
+  "description": "Helps users navigate websites using AI-like guidance.",
+
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
