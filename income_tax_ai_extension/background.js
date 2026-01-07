@@ -1,0 +1,54 @@
+const GEMINI_API_KEY = "AIzaSyDOHtPjrR3BbfeuGX7P-53r5kbNiuF7nqQ";
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === "ASK_AI") {
+    askGemini(request.pageText, request.userQuery)
+      .then(answer => sendResponse({ answer }))
+      .catch(err => {
+        console.error(err);
+        sendResponse({ answer: "Gemini fumbled the bag 😭" });
+      });
+
+    return true; // keeps async alive
+  }
+});
+
+async function askGemini(pageText, userQuery) {
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/models/` +
+    `gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text:
+`You are an AI that answers questions using ONLY the webpage content below.
+
+WEBPAGE:
+${pageText}
+
+QUESTION:
+${userQuery}`
+            }
+          ]
+        }
+      ]
+    })
+  });
+
+  const data = await res.json();
+
+  return (
+    data.candidates?.[0]?.content?.parts?.[0]?.text ||
+    "I couldn't understand the page clearly 😵‍💫"
+  );
+}
+
