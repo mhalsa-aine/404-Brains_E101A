@@ -1,17 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Universal AI Website Assistant",
-  "description": "AI-powered assistant that helps users navigate websites by understanding page content and user intent.",
   "version": "1.0",
+  "description": "Helps users navigate websites using AI-like guidance.",
 
   "action": {
-    "default_title": "Universal AI Website Assistant",
     "default_popup": "popup.html"
-  },
-
-  "permissions": [
-    "activeTab",
-    "scripting"
-  ]
+  }
 }
-
