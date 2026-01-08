@@ -123,56 +123,68 @@ app.post("/ai", async (req, res) => {
       try {
         console.log(`🤖 Using ${AI_PROVIDER} AI...`);
 
+        // Detect if it's a question vs navigation
+        const isQuestion = /^(what|where|how|why|when|who|which|can you tell|explain|describe|tell me)/i.test(query) ||
+                          query.includes('?');
+
         const prompt = `You are an intelligent website navigation assistant.
 
 CURRENT WEBSITE: ${page?.title || page?.url || "Unknown"}
+URL: ${page?.url || "Unknown"}
 
-AVAILABLE LINKS/BUTTONS:
+AVAILABLE LINKS/BUTTONS ON THIS PAGE:
 ${allItems.slice(0, 60).join('\n')}
 
 USER QUERY: "${query}"
 
-YOUR TASKS:
-1. If user wants to NAVIGATE somewhere, find the best matching item
-2. If user asks a QUESTION, answer it based on the page content
-3. Be smart about synonyms and variations
+ANALYSIS: This ${isQuestion ? 'IS A QUESTION' : 'might be navigation or a question'}.
 
-RESPOND IN THIS JSON FORMAT:
+YOUR TASK:
+${isQuestion ? 
+`The user is ASKING A QUESTION about the website. You MUST answer their question conversationally.
 
-For NAVIGATION queries ("go to", "show me", "open", "take me to"):
-{
-  "action": "navigate",
-  "target": "EXACT_ITEM_FROM_LIST_ABOVE",
-  "message": "Taking you to [destination]"
+ANSWER their question by:
+1. Explaining what this website is/does
+2. Mentioning relevant sections available
+3. Being helpful and informative
+
+Respond: {"action": "explain", "answer": "Your conversational answer explaining the website and what's available"}` 
+:
+`Determine if this is:
+A) A NAVIGATION request → respond with {"action": "navigate", "target": "EXACT_ITEM", "message": "Taking you there"}
+B) A QUESTION → respond with {"action": "explain", "answer": "Helpful answer about the website"}`
 }
 
-For QUESTION queries ("what", "where", "how", "tell me", "explain"):
-{
-  "action": "explain", 
-  "answer": "A helpful, conversational answer about the website and what's available. Be specific and mention actual items from the list."
-}
-
-IMPORTANT MATCHING RULES:
+NAVIGATION MATCHING RULES (only for navigation requests):
 - "sign in" = "login" = "Hello, sign in" = "Account & Lists"
-- "pricing" = "plans" = "cost" = "View Pricing"
-- "help" = "support" = "customer service" = "Help"
-- "cart" = "shopping bag" = "basket" = "Cart"
-- "orders" = "my orders" = "order history" = "Orders"
+- "cart" = "shopping cart" = "Cart"
+- "orders" = "my orders" = "Orders"
+- "pricing" = "plans" = "cost"
 
-BE SMART: If user says "sign in" and list has "Hello, sign in Account & Lists", match it!
+FOR QUESTIONS (like "what is this website"):
+- DO NOT navigate
+- DO NOT just list items
+- ANSWER the question conversationally
+- Explain what the website does
+- Mention key features/sections
+
+Example question responses:
+Q: "What is this website used for?"
+A: "This is Amazon, an online shopping platform where you can browse and purchase millions of products. You can search for items, add them to your cart, manage orders, and track deliveries. Key sections include: Cart for your items, Orders for purchase history, and Search to find products."
+
+Q: "What can I do here?"
+A: "On this page, you can access your Amazon account (Hello, sign in), view your shopping Cart, check your Orders, search for products, and browse different categories. You can shop for virtually anything from electronics to groceries."
 
 RESPOND ONLY WITH VALID JSON:`;
 
         const aiResponse = await askAI(prompt);
         console.log(`🤖 ${AI_PROVIDER} response:`, aiResponse);
 
-        // Try to extract JSON (handle both clean and wrapped responses)
+        // Try to extract JSON
         let parsed;
         try {
-          // First try direct parse
           parsed = JSON.parse(aiResponse);
         } catch {
-          // Try to find JSON in the response
           const jsonMatch = aiResponse.match(/\{[\s\S]*?"action"[\s\S]*?\}/);
           if (jsonMatch) {
             parsed = JSON.parse(jsonMatch[0]);
@@ -180,13 +192,18 @@ RESPOND ONLY WITH VALID JSON:`;
         }
 
         if (parsed && parsed.action) {
-          if (parsed.action === "navigate" && parsed.target) {
-            // Find the best match for the target (case-insensitive, partial match)
+          if (parsed.action === "explain" && parsed.answer) {
+            console.log("💬 AI answering question");
+            return res.json({
+              action: "explain",
+              answer: parsed.answer
+            });
+          } else if (parsed.action === "navigate" && parsed.target) {
+            // Find the best match
             let found = allItems.find(item => 
               item.toLowerCase() === parsed.target.toLowerCase()
             );
 
-            // If exact match not found, try partial matches
             if (!found) {
               found = allItems.find(item =>
                 item.toLowerCase().includes(parsed.target.toLowerCase()) ||
@@ -194,7 +211,6 @@ RESPOND ONLY WITH VALID JSON:`;
               );
             }
 
-            // Try word-by-word matching
             if (!found) {
               const targetWords = parsed.target.toLowerCase().split(/\s+/);
               found = allItems.find(item => {
@@ -210,15 +226,7 @@ RESPOND ONLY WITH VALID JSON:`;
                 target: found,
                 message: parsed.message || `Taking you to ${found}`
               });
-            } else {
-              console.log("⚠️ AI target not found:", parsed.target);
             }
-          } else if (parsed.action === "explain" && parsed.answer) {
-            console.log("💬 AI answering question");
-            return res.json({
-              action: "explain",
-              answer: parsed.answer
-            });
           }
         }
 
@@ -228,13 +236,68 @@ RESPOND ONLY WITH VALID JSON:`;
       }
     }
 
-    // ENHANCED FALLBACK: Smart keyword matching with synonyms
+    // ENHANCED FALLBACK with better question detection
+    const isDefiniteQuestion = /^(what|where|how|why|when|who|which|can you tell|explain|describe|tell me about)/i.test(query) ||
+                               query.includes('?');
+    
+    // If it's clearly a question, answer it - DON'T navigate
+    if (isDefiniteQuestion) {
+      console.log("💬 Detected question, providing answer");
+      
+      // Identify website/page type
+      const url = page?.url || "";
+      const title = page?.title || "";
+      
+      let websiteType = "website";
+      let mainPurpose = "browse and interact with various sections";
+      
+      if (url.includes("amazon") || title.toLowerCase().includes("amazon")) {
+        websiteType = "Amazon";
+        mainPurpose = "shop for products online. You can search for millions of items, add them to your cart, manage orders, and track deliveries";
+      } else if (url.includes("github")) {
+        websiteType = "GitHub";
+        mainPurpose = "host and collaborate on code. You can explore repositories, view documentation, and manage software projects";
+      } else if (url.includes("youtube")) {
+        websiteType = "YouTube";
+        mainPurpose = "watch and share videos. You can search for content, subscribe to channels, and manage your viewing history";
+      }
+      
+      // Categorize available items
+      const accountItems = allItems.filter(i => /account|sign|login|hello|profile/i.test(i)).slice(0, 2);
+      const shoppingItems = allItems.filter(i => /cart|order|wish|save|buy|shop/i.test(i)).slice(0, 2);
+      const navigationItems = allItems.filter(i => /home|search|menu|browse/i.test(i)).slice(0, 2);
+      const otherItems = allItems.filter(i => 
+        !/(account|sign|login|cart|order|wish|home|search|menu)/i.test(i)
+      ).slice(0, 3);
+      
+      let answer = `This is ${websiteType}, used to ${mainPurpose}. `;
+      
+      if (accountItems.length > 0) {
+        answer += `For account access: ${accountItems.join(", ")}. `;
+      }
+      if (shoppingItems.length > 0) {
+        answer += `For shopping/orders: ${shoppingItems.join(", ")}. `;
+      }
+      if (navigationItems.length > 0) {
+        answer += `Navigation options: ${navigationItems.join(", ")}. `;
+      }
+      if (otherItems.length > 0) {
+        answer += `Other features: ${otherItems.join(", ")}.`;
+      }
+      
+      return res.json({
+        action: "explain",
+        answer: answer
+      });
+    }
+
+    // Not a question - try to navigate
     const cleanQuery = query.toLowerCase()
       .replace(/^(go to|show me|take me to|open|find|i want|please|can you)\s+/i, '')
       .replace(/\b(the|a|an|page)\b/g, '')
       .trim();
 
-    console.log("🔍 Fallback search:", cleanQuery);
+    console.log("🔍 Fallback navigation search:", cleanQuery);
 
     // Define synonym mappings
     const synonyms = {
@@ -296,6 +359,7 @@ RESPOND ONLY WITH VALID JSON:`;
       }
     }
 
+    // After trying to find match...
     if (bestMatch && bestScore >= 50) {
       console.log("✅ Fallback matched:", bestMatch, "Score:", bestScore);
       return res.json({
@@ -305,35 +369,11 @@ RESPOND ONLY WITH VALID JSON:`;
       });
     }
 
-    // Answer questions in fallback mode
-    if (query.toLowerCase().includes('what') || query.toLowerCase().includes('help')) {
-      // Group similar items
-      const categories = {
-        account: allItems.filter(i => /account|sign|login|hello/i.test(i)),
-        shopping: allItems.filter(i => /cart|order|wish|save/i.test(i)),
-        navigation: allItems.filter(i => /home|search|menu/i.test(i))
-      };
-
-      let answer = `This appears to be ${page?.title || 'a website'}. `;
-      
-      if (categories.account.length > 0) {
-        answer += `For account access, you can use: ${categories.account.slice(0, 2).join(", ")}. `;
-      }
-      if (categories.shopping.length > 0) {
-        answer += `For shopping, there's: ${categories.shopping.slice(0, 2).join(", ")}. `;
-      }
-      
-      answer += `Other options include: ${allItems.slice(0, 5).join(", ")}.`;
-      
-      return res.json({
-        action: "explain",
-        answer: answer
-      });
-    }
-
+    // No match - provide helpful response
+    console.log("❌ No match found");
     return res.json({
       action: "explain",
-      answer: `I couldn't find "${cleanQuery}". Available: ${allItems.slice(0, 8).join(", ")}`
+      answer: `I couldn't find "${cleanQuery}" on this page. Available options: ${allItems.slice(0, 8).join(", ")}. What would you like to do?`
     });
 
   } catch (err) {
