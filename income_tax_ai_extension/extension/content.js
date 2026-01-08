@@ -1,69 +1,32 @@
-let lastHighlight = null;
+function extractPageStructure() {
+  return {
+    title: document.title,
+    url: location.href,
+    headings: [...document.querySelectorAll("h1,h2,h3")].map(h => h.innerText),
+    links: [...document.querySelectorAll("a")]
+      .map(a => a.innerText.trim())
+      .filter(Boolean),
+    buttons: [...document.querySelectorAll("button")]
+      .map(b => b.innerText.trim())
+      .filter(Boolean)
+  };
+}
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "FIND_AND_SCROLL") {
-    const query = request.query.trim();
-    if (!query) {
-      sendResponse({ found: false });
-      return;
+chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
+  if (req.type === "GET_PAGE_STRUCTURE") {
+    sendResponse(extractPageStructure());
+  }
+
+  if (req.type === "PERFORM_ACTION") {
+    const target = req.target.toLowerCase();
+
+    const link = [...document.querySelectorAll("a")]
+      .find(a => a.innerText.toLowerCase().includes(target));
+
+    if (link) {
+      link.style.outline = "3px solid red";
+      link.scrollIntoView({ behavior: "smooth" });
+      link.click();
     }
-
-    // Remove previous highlight
-    if (lastHighlight) {
-      lastHighlight.outerHTML = lastHighlight.innerText;
-      lastHighlight = null;
-    }
-
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: (node) => {
-          if (
-            node.parentElement &&
-            ["SCRIPT", "STYLE", "NOSCRIPT"].includes(
-              node.parentElement.tagName
-            )
-          ) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
-      }
-    );
-
-    const lowerQuery = query.toLowerCase();
-    let node;
-
-    while ((node = walker.nextNode())) {
-      const index = node.nodeValue.toLowerCase().indexOf(lowerQuery);
-      if (index !== -1) {
-        const range = document.createRange();
-        range.setStart(node, index);
-        range.setEnd(node, index + query.length);
-
-        const highlight = document.createElement("mark");
-        highlight.style.backgroundColor = "yellow";
-        highlight.style.padding = "2px";
-        highlight.style.borderRadius = "3px";
-
-        range.surroundContents(highlight);
-        lastHighlight = highlight;
-
-        highlight.scrollIntoView({
-          behavior: "smooth",
-          block: "center"
-        });
-
-        sendResponse({
-          found: true,
-          context: highlight.innerText
-        });
-        return;
-      }
-    }
-
-    sendResponse({ found: false });
   }
 });
-

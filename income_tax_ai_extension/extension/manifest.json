@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Website Reading Chatbot",
-  "version": "1.0",
-  "description": "Chatbot that reads website content",
+  "name": "AI Website Assistant",
+  "version": "2.0",
+  "description": "AI that understands and navigates websites",
   "permissions": ["activeTab", "scripting"],
   "host_permissions": ["<all_urls>"],
   "action": {
@@ -15,3 +15,5 @@
     }
   ]
 }
+
+

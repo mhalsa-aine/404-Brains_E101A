@@ -2,10 +2,16 @@ const chatBox = document.getElementById("chat-box");
 const input = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 
-sendBtn.addEventListener("click", sendMessage);
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") sendMessage();
-});
+sendBtn.onclick = sendMessage;
+input.onkeydown = e => e.key === "Enter" && sendMessage();
+
+function addMessage(text, sender) {
+  const div = document.createElement("div");
+  div.className = `message ${sender}`;
+  div.innerText = text;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
 
 function sendMessage() {
   const text = input.value.trim();
@@ -14,36 +20,32 @@ function sendMessage() {
   addMessage(text, "user");
   input.value = "";
 
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
     chrome.tabs.sendMessage(
-      tabs[0].id,
-      {
-        type: "FIND_AND_SCROLL",
-        query: text
-      },
-      (response) => {
-        if (response?.found) {
-          addMessage(
-            "Found it 👀 — I’ve highlighted it on the page.",
-            "bot"
-          );
-        } else {
-          addMessage(
-            "I read the page, but I couldn’t find that clearly 😔",
-            "bot"
-          );
-        }
+      tab.id,
+      { type: "GET_PAGE_STRUCTURE" },
+      pageData => {
+        fetch("http://localhost:3000/ai", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: text,
+            page: pageData
+          })
+        })
+          .then(res => res.json())
+          .then(ai => {
+            if (ai.action === "navigate") {
+              chrome.tabs.sendMessage(tab.id, {
+                type: "PERFORM_ACTION",
+                target: ai.target
+              });
+              addMessage(`Navigating to ${ai.target}…`, "bot");
+            } else {
+              addMessage(ai.answer, "bot");
+            }
+          });
       }
     );
   });
 }
-
-function addMessage(text, sender) {
-  const msg = document.createElement("div");
-  msg.className = `message ${sender}`;
-  msg.innerText = text;
-  chatBox.appendChild(msg);
-  chatBox.scrollTop = chatBox.scrollHeight;
-}
-
-
