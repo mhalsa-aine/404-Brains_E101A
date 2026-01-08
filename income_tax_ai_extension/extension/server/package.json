@@ -1,5 +1,5 @@
 {
-  "name": "ai-server",
+  "name": "grok-ai-server",
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
@@ -7,9 +7,9 @@
     "start": "node index.js"
   },
   "dependencies": {
+    "express": "^4.19.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
-    "express": "^4.19.2",
     "node-fetch": "^2.6.7"
   }
 }

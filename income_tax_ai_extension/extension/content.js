@@ -1,4 +1,4 @@
-function extractPage() {
+function getPageData() {
   const links = [...document.querySelectorAll("a")]
     .map(a => a.innerText.trim())
     .filter(t => t && t.length < 80);
@@ -17,20 +17,39 @@ function extractPage() {
 
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
   if (req.type === "GET_PAGE") {
-    sendResponse(extractPage());
+    sendResponse(getPageData());
   }
 
   if (req.type === "PERFORM_ACTION") {
     const target = req.target.toLowerCase();
     const elements = [...document.querySelectorAll("a, button")];
 
-    const found = elements.find(el =>
-      el.innerText.toLowerCase().includes(target)
-    );
+    let best = null;
+    let score = 0;
 
-    if (found) {
-      found.scrollIntoView({ behavior: "smooth", block: "center" });
-      found.click();
+    elements.forEach(el => {
+      const text = el.innerText.toLowerCase();
+      if (!text) return;
+
+      let s = 0;
+      if (text === target) s = 100;
+      else if (text.includes(target)) s = 80;
+      else if (target.includes(text)) s = 60;
+      else {
+        const t = target.split(" ");
+        const e = text.split(" ");
+        if (t.some(w => e.some(x => x.includes(w)))) s = 50;
+      }
+
+      if (s > score) {
+        score = s;
+        best = el;
+      }
+    });
+
+    if (best && score >= 40) {
+      best.scrollIntoView({ behavior: "smooth", block: "center" });
+      best.click();
       sendResponse({ success: true });
     } else {
       sendResponse({ success: false });

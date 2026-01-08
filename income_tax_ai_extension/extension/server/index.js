@@ -6,7 +6,7 @@ import fetch from "node-fetch";
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -15,16 +15,12 @@ const GROK_API_KEY = process.env.GROK_API_KEY;
 
 /* Health check */
 app.get("/", (req, res) => {
-  res.json({
-    status: "running",
-    ai: !!GROK_API_KEY,
-    provider: "GROK (xAI)"
-  });
+  res.json({ status: "running", ai: true, provider: "Grok" });
 });
 
 /* Grok call */
 async function askGrok(prompt) {
-  const response = await fetch("https://api.x.ai/v1/chat/completions", {
+  const res = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -32,6 +28,8 @@ async function askGrok(prompt) {
     },
     body: JSON.stringify({
       model: "grok-2-latest",
+      temperature: 0.4,
+      max_tokens: 600,
       messages: [
         {
           role: "system",
@@ -39,26 +37,18 @@ async function askGrok(prompt) {
             "You are a website assistant. Respond ONLY with valid JSON."
         },
         { role: "user", content: prompt }
-      ],
-      temperature: 0.4,
-      max_tokens: 500
+      ]
     })
   });
 
-  const data = await response.json();
-  return data.choices?.[0]?.message?.content || "";
+  const data = await res.json();
+  return data.choices[0].message.content;
 }
 
 /* AI endpoint */
 app.post("/ai", async (req, res) => {
   try {
     const { query, page } = req.body;
-    if (!query) {
-      return res.json({
-        action: "explain",
-        answer: "Please ask something."
-      });
-    }
 
     const items = [
       ...(page?.links || []).map(l => l.text),
@@ -69,16 +59,36 @@ app.post("/ai", async (req, res) => {
 WEBSITE: ${page?.title}
 URL: ${page?.url}
 
-ITEMS:
-${items.slice(0, 40).join("\n")}
+VISIBLE ITEMS:
+${items.slice(0, 60).join("\n")}
 
-USER QUERY: "${query}"
+USER INPUT:
+"${query}"
 
-RULES:
-- Navigation → {"action":"navigate","target":"EXACT_TEXT","message":"Navigating"}
-- Question → {"action":"explain","answer":"Helpful answer"}
+TASK:
+- Understand intent, not exact words
+- login → sign in / sign up / account
+- signup → register / create account
+- If navigation makes sense, navigate
+- ALSO explain briefly
 
-JSON ONLY
+JSON FORMAT:
+
+If navigate:
+{
+  "action": "navigate",
+  "target": "BEST_MATCH_FROM_ITEMS",
+  "message": "Navigating for you",
+  "answer": "Explanation"
+}
+
+Else:
+{
+  "action": "explain",
+  "answer": "Helpful answer"
+}
+
+JSON ONLY.
 `;
 
     const aiText = await askGrok(prompt);
@@ -91,18 +101,16 @@ JSON ONLY
       if (match) parsed = JSON.parse(match[0]);
     }
 
-    if (!parsed?.action) throw new Error("Bad AI response");
-
     res.json(parsed);
-  } catch (err) {
-    res.status(500).json({
+  } catch {
+    res.json({
       action: "explain",
-      answer: "AI error. Try again."
+      answer: "I couldn’t understand that. Try again."
     });
   }
 });
 
-app.listen(port, () => {
+app.listen(PORT, () => {
   console.log("🤖 GROK AI SERVER RUNNING");
-  console.log("🌐 http://localhost:" + port);
+  console.log("🌐 http://localhost:" + PORT);
 });
