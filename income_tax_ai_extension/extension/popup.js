@@ -2,9 +2,7 @@ const chatBox = document.getElementById("chat-box");
 const input = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 
-// Always enable input
 input.disabled = false;
-input.focus();
 
 sendBtn.addEventListener("click", sendMessage);
 input.addEventListener("keydown", (e) => {
@@ -25,70 +23,40 @@ function sendMessage() {
 
   addMessage(text, "user");
   input.value = "";
-  input.disabled = false;
-  input.focus();
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs || !tabs[0]) {
-      addMessage("⚠️ No active tab.", "bot");
+      addMessage("No active website detected.", "bot");
       return;
     }
 
-    const tabId = tabs[0].id;
-
     chrome.tabs.sendMessage(
-      tabId,
+      tabs[0].id,
       { type: "GET_PAGE_STRUCTURE" },
       (pageData) => {
 
-        if (chrome.runtime.lastError) {
+        if (chrome.runtime.lastError || !pageData) {
           addMessage("⚠️ Open a normal website (not chrome:// pages).", "bot");
           return;
         }
 
-        if (!pageData) {
-          addMessage("⚠️ Could not read this page.", "bot");
-          return;
-        }
-
-        fetch("http://localhost:3000/ai", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query: text,
-            page: pageData
-          })
-        })
-          .then(async (res) => {
-            if (!res.ok) {
-              const errText = await res.text();
-              throw new Error(errText || "Server error");
+        chrome.runtime.sendMessage(
+          {
+            type: "AI_FETCH",
+            payload: {
+              query: text,
+              page: pageData
             }
-            return res.json();
-          })
-          .then((ai) => {
-            if (!ai || !ai.action) {
-              addMessage("⚠️ AI returned no usable response.", "bot");
+          },
+          (response) => {
+            if (!response || !response.success) {
+              addMessage("Server error.", "bot");
               return;
             }
 
-            if (ai.action === "navigate" && ai.target) {
-              addMessage(`Navigating to ${ai.target}…`, "bot");
-
-              chrome.tabs.sendMessage(tabId, {
-                type: "PERFORM_ACTION",
-                target: ai.target
-              });
-            } else if (ai.action === "explain" && ai.answer) {
-              addMessage(ai.answer, "bot");
-            } else {
-              addMessage("⚠️ I didn’t understand that request.", "bot");
-            }
-          })
-          .catch((err) => {
-            console.error(err);
-            addMessage("❌ AI server error. Check server terminal.", "bot");
-          });
+            addMessage(response.data.answer, "bot");
+          }
+        );
       }
     );
   });

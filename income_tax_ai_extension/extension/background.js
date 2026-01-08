@@ -7,22 +7,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       },
       body: JSON.stringify(request.payload)
     })
-      .then(async (res) => {
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text);
-        }
-        return res.json();
-      })
-      .then((data) => {
+      .then(res => res.json())
+      .then(data => {
         sendResponse({ success: true, data });
       })
-      .catch((err) => {
-        console.error("Background fetch error:", err);
-        sendResponse({ success: false, error: err.message });
+      .catch(err => {
+        sendResponse({ success: false });
       });
 
-    // Required to keep message channel open
+    // REQUIRED for async response
     return true;
   }
 });

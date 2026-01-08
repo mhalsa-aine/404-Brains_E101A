@@ -2,15 +2,12 @@
   "manifest_version": 3,
   "name": "Website Reading Chatbot",
   "version": "1.0",
-  "description": "AI assistant that understands and navigates websites",
-  "permissions": [
-    "activeTab",
-    "scripting"
-  ],
-  "host_permissions": [
-    "http://localhost:3000/*",
-    "<all_urls>"
-  ],
+  "description": "AI assistant that guides users through websites",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["<all_urls>", "http://localhost:3000/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html"
   },
