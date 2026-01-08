@@ -6,7 +6,7 @@ import fetch from "node-fetch";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
@@ -15,10 +15,10 @@ const GROK_API_KEY = process.env.GROK_API_KEY;
 
 /* Health check */
 app.get("/", (req, res) => {
-  res.json({ status: "running", ai: true, provider: "Grok" });
+  res.json({ status: "running", ai: true });
 });
 
-/* Grok call */
+/* Call Grok */
 async function askGrok(prompt) {
   const res = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
@@ -34,7 +34,7 @@ async function askGrok(prompt) {
         {
           role: "system",
           content:
-            "You are a website assistant. Respond ONLY with valid JSON."
+            "You are a website navigation AI. Respond ONLY with valid JSON."
         },
         { role: "user", content: prompt }
       ]
@@ -51,44 +51,43 @@ app.post("/ai", async (req, res) => {
     const { query, page } = req.body;
 
     const items = [
-      ...(page?.links || []).map(l => l.text),
-      ...(page?.buttons || [])
+      ...(page.links || []).map(l => l.text),
+      ...(page.buttons || [])
     ].filter(Boolean);
 
     const prompt = `
-WEBSITE: ${page?.title}
-URL: ${page?.url}
+WEBSITE TITLE: ${page.title}
+URL: ${page.url}
 
-VISIBLE ITEMS:
+CLICKABLE ITEMS:
 ${items.slice(0, 60).join("\n")}
 
 USER INPUT:
 "${query}"
 
-TASK:
-- Understand intent, not exact words
-- login → sign in / sign up / account
-- signup → register / create account
-- If navigation makes sense, navigate
-- ALSO explain briefly
+YOUR TASK:
+1. Understand user intent (not exact words).
+2. login → sign in / account / create account
+3. signup → register / create account
+4. cart → basket / bag
+5. If navigation makes sense, navigate.
+6. ALSO explain in simple words.
 
-JSON FORMAT:
+RESPONSE FORMAT (JSON ONLY):
 
-If navigate:
+If navigation is needed:
 {
   "action": "navigate",
-  "target": "BEST_MATCH_FROM_ITEMS",
+  "target": "BEST MATCH FROM CLICKABLE ITEMS",
   "message": "Navigating for you",
   "answer": "Explanation"
 }
 
-Else:
+If only explanation:
 {
   "action": "explain",
-  "answer": "Helpful answer"
+  "answer": "Helpful explanation"
 }
-
-JSON ONLY.
 `;
 
     const aiText = await askGrok(prompt);
@@ -98,14 +97,16 @@ JSON ONLY.
       parsed = JSON.parse(aiText);
     } catch {
       const match = aiText.match(/\{[\s\S]*\}/);
-      if (match) parsed = JSON.parse(match[0]);
+      parsed = match ? JSON.parse(match[0]) : null;
     }
 
+    if (!parsed) throw new Error("Invalid AI response");
+
     res.json(parsed);
-  } catch {
+  } catch (err) {
     res.json({
       action: "explain",
-      answer: "I couldn’t understand that. Try again."
+      answer: "Sorry, I couldn’t understand that."
     });
   }
 });
