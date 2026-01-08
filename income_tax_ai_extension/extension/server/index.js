@@ -31,42 +31,79 @@ app.get("/", (req, res) => {
 
 // Smart matching function
 function findBestMatch(query, availableItems) {
-  const q = query.toLowerCase();
+  const q = query.toLowerCase().trim();
   const matches = [];
 
+  console.log(`\n🔍 Searching for: "${q}"`);
+  console.log(`📦 Searching in ${availableItems.length} items`);
+
   for (const item of availableItems) {
-    const itemLower = item.toLowerCase();
+    if (!item || typeof item !== 'string') continue;
     
-    // Exact match
+    const itemLower = item.toLowerCase().trim();
+    
+    // Skip if item is too short or empty
+    if (itemLower.length === 0) continue;
+    
+    // Exact match - highest priority
     if (itemLower === q) {
+      console.log(`  ✅ EXACT match: "${item}" (score: 100)`);
       matches.push({ item, score: 100 });
       continue;
     }
     
-    // Contains query
-    if (itemLower.includes(q)) {
-      matches.push({ item, score: 80 });
-      continue;
-    }
-    
-    // Query contains item
-    if (q.includes(itemLower)) {
-      matches.push({ item, score: 70 });
-      continue;
-    }
-    
-    // Word overlap
-    const queryWords = q.split(/\s+/);
+    // Exact word match in item
     const itemWords = itemLower.split(/\s+/);
-    const overlap = queryWords.filter(w => itemWords.some(iw => iw.includes(w) || w.includes(iw)));
+    if (itemWords.includes(q)) {
+      console.log(`  ✅ WORD match: "${item}" (score: 95)`);
+      matches.push({ item, score: 95 });
+      continue;
+    }
     
-    if (overlap.length > 0) {
-      matches.push({ item, score: 50 + (overlap.length * 10) });
+    // Item contains query (only if query is substantial)
+    if (q.length >= 3 && itemLower.includes(q)) {
+      const score = 80 + (q.length / itemLower.length) * 10;
+      console.log(`  ✓ Contains: "${item}" (score: ${score.toFixed(0)})`);
+      matches.push({ item, score });
+      continue;
+    }
+    
+    // Query contains item (be more strict)
+    if (itemLower.length >= 4 && q.includes(itemLower)) {
+      const score = 60 + (itemLower.length / q.length) * 10;
+      console.log(`  ~ Contained in query: "${item}" (score: ${score.toFixed(0)})`);
+      matches.push({ item, score });
+      continue;
+    }
+    
+    // Word overlap (only for multi-word queries)
+    const queryWords = q.split(/\s+/);
+    if (queryWords.length > 1) {
+      const overlap = queryWords.filter(w => 
+        w.length >= 3 && itemWords.some(iw => iw.includes(w) || w.includes(iw))
+      );
+      
+      if (overlap.length > 0) {
+        const score = 40 + (overlap.length * 15);
+        console.log(`  - Word overlap: "${item}" (score: ${score}, words: ${overlap.join(',')})`);
+        matches.push({ item, score });
+      }
     }
   }
 
   matches.sort((a, b) => b.score - a.score);
-  return matches.length > 0 ? matches[0].item : null;
+  
+  if (matches.length > 0) {
+    console.log(`\n🎯 Best match: "${matches[0].item}" with score ${matches[0].score}`);
+    if (matches.length > 1) {
+      console.log(`   Alternatives:`, matches.slice(1, 4).map(m => `"${m.item}" (${m.score})`).join(', '));
+    }
+  } else {
+    console.log(`\n❌ No matches found for "${q}"`);
+  }
+  
+  // Only return if score is good enough
+  return matches.length > 0 && matches[0].score >= 50 ? matches[0].item : null;
 }
 
 // Enhanced AI endpoint
@@ -189,18 +226,47 @@ Rules:
 
     console.log("🔍 Extracted keywords:", extractedKeywords);
 
+    // Common aliases for better matching
+    const aliases = {
+      'signin': 'sign in',
+      'signup': 'sign up',
+      'log in': 'login',
+      'log out': 'logout',
+      'my account': 'account',
+      'shopping bag': 'cart',
+      'shopping basket': 'cart',
+      'check out': 'checkout'
+    };
+
+    // Apply aliases
+    if (aliases[extractedKeywords]) {
+      console.log(`🔄 Using alias: "${extractedKeywords}" → "${aliases[extractedKeywords]}"`);
+      extractedKeywords = aliases[extractedKeywords];
+    }
+
     // Get all available navigation items
     const allLinks = (page?.links || []).map(l => l.text).filter(Boolean);
     const allButtons = (page?.buttons || []).filter(Boolean);
-    const allItems = [...allLinks, ...allButtons];
+    const allNavItems = (page?.navItems || []).filter(Boolean);
+    
+    // Combine all items, prioritizing nav items and common patterns
+    const allItems = [
+      ...allNavItems,
+      ...allButtons,
+      ...allLinks
+    ];
+    
+    // Remove duplicates while preserving order
+    const uniqueItems = [...new Set(allItems)];
 
-    console.log("🎯 Searching in:", allItems);
+    console.log("🎯 Total unique items to search:", uniqueItems.length);
+    console.log("📋 Sample items:", uniqueItems.slice(0, 10).join(", "));
 
     // Try to find best match
-    const bestMatch = findBestMatch(extractedKeywords, allItems);
+    const bestMatch = findBestMatch(extractedKeywords, uniqueItems);
 
     if (bestMatch) {
-      console.log("✅ Found match:", bestMatch);
+      console.log("✅ Final match decision:", bestMatch);
       return res.json({
         action: "navigate",
         target: bestMatch
@@ -209,7 +275,8 @@ Rules:
 
     // If no match found but it's a navigation query
     if (isNavigationQuery) {
-      const suggestions = allItems.slice(0, 5).join(", ");
+      const suggestions = uniqueItems.slice(0, 5).join(", ");
+      console.log("❌ No match found. Suggestions:", suggestions);
       return res.json({
         action: "explain",
         answer: `I couldn't find "${extractedKeywords}" on this page. Available sections include: ${suggestions}. Try asking about one of these.`
@@ -224,14 +291,9 @@ Rules:
         info.push(`You're on the "${page.title}" page.`);
       }
       
-      if (allLinks.length > 0) {
-        const topLinks = allLinks.slice(0, 8).join(", ");
-        info.push(`Available sections: ${topLinks}`);
-      }
-      
-      if (allButtons.length > 0) {
-        const topButtons = allButtons.slice(0, 5).join(", ");
-        info.push(`Actions: ${topButtons}`);
+      if (uniqueItems.length > 0) {
+        const topItems = uniqueItems.slice(0, 8).join(", ");
+        info.push(`Available sections: ${topItems}`);
       }
 
       return res.json({
@@ -243,7 +305,7 @@ Rules:
     // General query - try to be helpful
     return res.json({
       action: "explain",
-      answer: `I can help you navigate this page. Available options: ${allItems.slice(0, 6).join(", ")}. What would you like to do?`
+      answer: `I can help you navigate this page. Available options: ${uniqueItems.slice(0, 6).join(", ")}. What would you like to do?`
     });
 
   } catch (err) {
