@@ -2,6 +2,48 @@
 (function() {
   console.log("🚀 AI Website Assistant content script loaded on:", location.href);
 
+  // Helper function to safely click elements
+  function safeClick(element) {
+    try {
+      // Method 1: Direct navigation for links
+      if (element.tagName === 'A' && element.href && !element.href.startsWith('javascript:')) {
+        window.location.href = element.href;
+        return true;
+      }
+
+      // Method 2: Dispatch MouseEvent (CSP-safe)
+      const events = ['mousedown', 'mouseup', 'click'];
+      events.forEach(eventType => {
+        const event = new MouseEvent(eventType, {
+          view: window,
+          bubbles: true,
+          cancelable: true,
+          clientX: element.getBoundingClientRect().left + 5,
+          clientY: element.getBoundingClientRect().top + 5
+        });
+        element.dispatchEvent(event);
+      });
+
+      // Method 3: Focus and trigger keyboard event for buttons
+      if (element.tagName === 'BUTTON' || element.tagName === 'INPUT') {
+        element.focus();
+        const enterEvent = new KeyboardEvent('keydown', {
+          key: 'Enter',
+          code: 'Enter',
+          keyCode: 13,
+          bubbles: true,
+          cancelable: true
+        });
+        element.dispatchEvent(enterEvent);
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Safe click error:", error);
+      return false;
+    }
+  }
+
   function extractPageStructure() {
     try {
       // Get all interactive elements
@@ -155,13 +197,26 @@
       if (bestMatch && bestScore > 40) {
         console.log("✅ Found match:", bestMatch.innerText || bestMatch.value, "Score:", bestScore);
         
+        // Highlight the element
         bestMatch.style.outline = "3px solid #007bff";
         bestMatch.style.outlineOffset = "2px";
+        bestMatch.style.transition = "outline 0.3s ease";
         bestMatch.scrollIntoView({ behavior: "smooth", block: "center" });
         
+        // Wait for scroll, then click
         setTimeout(() => {
-          bestMatch.click();
-        }, 500);
+          const success = safeClick(bestMatch);
+          
+          if (!success && bestMatch.href) {
+            // Fallback: direct navigation
+            window.location.href = bestMatch.href;
+          }
+          
+          // Remove highlight after action
+          setTimeout(() => {
+            bestMatch.style.outline = "";
+          }, 1000);
+        }, 600);
         
         sendResponse({ success: true, matched: bestMatch.innerText || bestMatch.value });
       } else {

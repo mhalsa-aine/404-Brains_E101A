@@ -5,11 +5,11 @@
   "description": "AI assistant that understands and navigates websites",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
-    "<all_urls>",
-    "http://localhost:3000/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
@@ -20,8 +20,12 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
     }
-  ]
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
 }
-
