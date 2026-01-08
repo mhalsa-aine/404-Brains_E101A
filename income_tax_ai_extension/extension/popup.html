@@ -2,17 +2,18 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>AI Assistant</title>
+  <title>Typing Test</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="app">
-    <div id="chat"></div>
-
-    <div id="input-bar">
-      <input id="input" placeholder="Ask or navigate..." />
-      <button id="send">➤</button>
-    </div>
+  <div id="wrapper">
+    <input
+      id="input"
+      type="text"
+      placeholder="Type here"
+    />
+    <button id="btn">Send</button>
+    <div id="log"></div>
   </div>
 
   <script src="popup.js"></script>

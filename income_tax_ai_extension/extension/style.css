@@ -1,57 +1,32 @@
-* { box-sizing: border-box; }
-
 body {
   margin: 0;
-  width: 350px;
-  height: 500px;
-  background: #0f172a;
-  color: white;
-  font-family: system-ui;
+  width: 300px;
+  height: 200px;
+  background: #111;
+  font-family: Arial, sans-serif;
 }
 
-#app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-#chat {
-  flex: 1;
+#wrapper {
   padding: 10px;
-  overflow-y: auto;
-}
-
-.msg {
-  margin-bottom: 8px;
-  padding: 8px 12px;
-  border-radius: 12px;
-  max-width: 85%;
-}
-
-.user { background: #2563eb; margin-left: auto; }
-.bot { background: #1e293b; }
-
-#input-bar {
-  display: flex;
-  gap: 6px;
-  padding: 8px;
-  background: #020617;
 }
 
 #input {
-  flex: 1;
-  padding: 8px;
-  background: #020617;
+  width: 100%;
+  height: 36px;
+  font-size: 16px;
   color: white;
-  border: 1px solid #334155;
-  border-radius: 8px;
+  background: black;
+  border: 1px solid #555;
 }
 
-#send {
-  background: #2563eb;
-  border: none;
-  color: white;
-  border-radius: 8px;
-  padding: 0 14px;
+#btn {
+  margin-top: 10px;
+  width: 100%;
+  height: 36px;
 }
 
+#log {
+  margin-top: 10px;
+  color: white;
+  font-size: 14px;
+}
