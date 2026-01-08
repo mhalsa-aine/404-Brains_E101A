@@ -2,8 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from .env1 file
+dotenv.config({ path: '.env1' });
 
 const app = express();
 const port = 3000;
@@ -201,13 +201,16 @@ app.listen(port, () => {
   console.log("🤖 AI WEBSITE ASSISTANT");
   console.log("=".repeat(60));
   console.log("🚀 Server: http://localhost:" + port);
+  console.log("📂 Reading from: .env1 file");
   
   if (GEMINI_API_KEY) {
     console.log("🧠 AI: Google Gemini ENABLED ✅");
     console.log("💰 Cost: FREE!");
+    console.log("🔑 Key: " + GEMINI_API_KEY.substring(0, 10) + "...");
   } else {
-    console.log("⚠️  AI: DISABLED");
-    console.log("💡 Add GEMINI_API_KEY to .env for AI features");
+    console.log("⚠️  AI: DISABLED - Key not found in .env1");
+    console.log("💡 Make sure .env1 contains:");
+    console.log("   GEMINI_API_KEY=your_key_here");
     console.log("📝 Get free key: https://aistudio.google.com/app/apikey");
   }
   
