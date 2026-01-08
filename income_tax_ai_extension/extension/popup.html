@@ -1,19 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>Typing Test</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <title>Website AI Assistant</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="wrapper">
-    <input
-      id="input"
-      type="text"
-      placeholder="Type here"
-    />
-    <button id="btn">Send</button>
-    <div id="log"></div>
+  <div id="app">
+    <header>🤖 Website Assistant</header>
+
+    <div id="chat"></div>
+
+    <div id="input-bar">
+      <input
+        id="input"
+        type="text"
+        placeholder="Ask or navigate…"
+        autocomplete="off"
+      />
+      <button id="send">➤</button>
+    </div>
   </div>
 
   <script src="popup.js"></script>
