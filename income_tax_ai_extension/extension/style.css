@@ -4,7 +4,7 @@ body {
   height: 500px;
   background: #0f172a;
   color: white;
-  font-family: system-ui;
+  font-family: system-ui, sans-serif;
 }
 
 .chat {
@@ -17,6 +17,7 @@ header {
   padding: 12px;
   text-align: center;
   background: linear-gradient(135deg, #2563eb, #1e40af);
+  font-weight: bold;
 }
 
 #chat-box {
@@ -30,6 +31,7 @@ header {
   padding: 8px 12px;
   border-radius: 12px;
   max-width: 85%;
+  font-size: 14px;
 }
 
 .user {
@@ -49,9 +51,17 @@ header {
 
 input {
   flex: 1;
-  padding: 8px;
+  padding: 8px 10px;
   border-radius: 8px;
   border: none;
+  outline: none;
+  background: #0f172a;
+  color: white;              /* ✅ FIX */
+  font-size: 14px;
+}
+
+input::placeholder {
+  color: #94a3b8;
 }
 
 button {
@@ -61,4 +71,5 @@ button {
   color: white;
   padding: 0 14px;
   border-radius: 8px;
+  cursor: pointer;
 }

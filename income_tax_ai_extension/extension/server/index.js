@@ -9,11 +9,11 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json());
 
 const GROK_API_KEY = process.env.GROK_API_KEY;
 
-// ✅ Health check
+/* Health check */
 app.get("/", (req, res) => {
   res.json({
     status: "running",
@@ -22,7 +22,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// 🧠 Grok API call
+/* Grok call */
 async function askGrok(prompt) {
   const response = await fetch("https://api.x.ai/v1/chat/completions", {
     method: "POST",
@@ -36,32 +36,23 @@ async function askGrok(prompt) {
         {
           role: "system",
           content:
-            "You are a website navigation assistant. Respond ONLY with valid JSON. No markdown. No explanations."
+            "You are a website assistant. Respond ONLY with valid JSON."
         },
-        {
-          role: "user",
-          content: prompt
-        }
+        { role: "user", content: prompt }
       ],
       temperature: 0.4,
-      max_tokens: 600
+      max_tokens: 500
     })
   });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(text);
-  }
 
   const data = await response.json();
   return data.choices?.[0]?.message?.content || "";
 }
 
-// 🎯 MAIN AI ENDPOINT
+/* AI endpoint */
 app.post("/ai", async (req, res) => {
   try {
     const { query, page } = req.body;
-
     if (!query) {
       return res.json({
         action: "explain",
@@ -79,15 +70,15 @@ WEBSITE: ${page?.title}
 URL: ${page?.url}
 
 ITEMS:
-${items.slice(0, 50).join("\n")}
+${items.slice(0, 40).join("\n")}
 
 USER QUERY: "${query}"
 
 RULES:
-- If navigation → { "action":"navigate","target":"EXACT_TEXT","message":"..." }
-- If question → { "action":"explain","answer":"..." }
+- Navigation → {"action":"navigate","target":"EXACT_TEXT","message":"Navigating"}
+- Question → {"action":"explain","answer":"Helpful answer"}
 
-RESPOND ONLY JSON
+JSON ONLY
 `;
 
     const aiText = await askGrok(prompt);
@@ -100,21 +91,18 @@ RESPOND ONLY JSON
       if (match) parsed = JSON.parse(match[0]);
     }
 
-    if (!parsed?.action) throw new Error("Invalid AI JSON");
+    if (!parsed?.action) throw new Error("Bad AI response");
 
     res.json(parsed);
   } catch (err) {
-    console.error(err);
     res.status(500).json({
       action: "explain",
-      answer: "AI error. Please try again."
+      answer: "AI error. Try again."
     });
   }
 });
 
 app.listen(port, () => {
-  console.log("==================================");
   console.log("🤖 GROK AI SERVER RUNNING");
   console.log("🌐 http://localhost:" + port);
-  console.log("==================================");
 });
