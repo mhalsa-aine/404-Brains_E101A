@@ -24,10 +24,28 @@ function extractPageStructure() {
     }
   });
   
+  // Get page title with better fallback
+  let pageTitle = document.title;
+  if (!pageTitle || pageTitle.trim() === "") {
+    // Try to get from meta tags
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    const twitterTitle = document.querySelector('meta[name="twitter:title"]');
+    
+    if (ogTitle && ogTitle.content) {
+      pageTitle = ogTitle.content;
+    } else if (twitterTitle && twitterTitle.content) {
+      pageTitle = twitterTitle.content;
+    } else {
+      // Use domain name as fallback
+      pageTitle = window.location.hostname.replace('www.', '');
+    }
+  }
+  
   console.log("✅ Found:", links.length, "links,", buttons.length, "buttons");
+  console.log("📄 Page title:", pageTitle);
   
   return {
-    title: document.title,
+    title: pageTitle,
     url: location.href,
     links: links.map(l => ({ text: l.text, href: l.href })),
     buttons: buttons

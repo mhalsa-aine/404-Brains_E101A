@@ -13,13 +13,13 @@ let openai = null;
 if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_api_key_here') {
   try {
     openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    console.log("✅ OpenAI initialized");
+    console.log("✅ OpenAI initialized - TRUE AI MODE");
   } catch (e) {
     console.log("⚠️ OpenAI init failed:", e.message);
   }
 } else {
-  console.log("⚠️ No OpenAI API key found");
-  console.log("💡 Add OPENAI_API_KEY to .env file for AI features");
+  console.log("❌ No OpenAI API key - AI features disabled");
+  console.log("💡 Add OPENAI_API_KEY to .env file");
 }
 
 app.use(cors());
@@ -28,210 +28,241 @@ app.use(express.json({ limit: "10mb" }));
 app.get("/", (req, res) => {
   res.json({ 
     status: "running",
-    ai: !!openai
+    ai: !!openai,
+    mode: openai ? "AI_CHATBOT" : "FALLBACK"
   });
 });
 
-// Fallback matching for when AI is not available
-function fallbackMatch(query, items) {
-  const q = query.toLowerCase().trim();
-  let bestMatch = null;
-  let bestScore = 0;
-
-  for (const item of items) {
-    if (!item) continue;
-    const itemLower = item.toLowerCase().trim();
-    let score = 0;
-
-    if (itemLower === q) score = 100;
-    else if (itemLower.includes(q)) score = 80;
-    else if (itemLower.length >= 3 && q.includes(itemLower)) score = 60;
-    else {
-      const qWords = q.split(/\s+/);
-      const iWords = itemLower.split(/\s+/);
-      const overlap = qWords.filter(w => iWords.includes(w));
-      if (overlap.length > 0) score = 40 + (overlap.length * 10);
-    }
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = item;
-    }
-  }
-
-  return bestScore >= 40 ? bestMatch : null;
-}
+// Store conversation history (in production, use a database)
+const conversations = new Map();
 
 app.post("/ai", async (req, res) => {
   try {
-    const { query, page } = req.body;
+    const { query, page, conversationId } = req.body;
 
     if (!query) {
       return res.status(400).json({
         action: "explain",
-        answer: "No query provided."
+        answer: "Please ask me something!"
       });
     }
 
-    console.log("\n" + "=".repeat(60));
+    console.log("\n" + "=".repeat(70));
+    console.log("🤖 AI CHATBOT MODE");
     console.log("📝 Query:", query);
-    console.log("📄 Page:", page?.title || "Unknown");
+    console.log("📄 Page:", page?.title || page?.url || "Unknown");
     console.log("🌐 URL:", page?.url || "Unknown");
+    console.log("🆔 Conversation:", conversationId || "new");
 
-    // Get all available items
-    const allLinks = (page?.links || []).map(l => l.text).filter(t => t && t.length > 0 && t.length < 100);
-    const allButtons = (page?.buttons || []).filter(t => t && t.length > 0 && t.length < 100);
-    const allItems = [...new Set([...allLinks, ...allButtons])]; // Remove duplicates
+    // Get conversation history
+    const history = conversations.get(conversationId) || [];
 
-    console.log("📊 Found:", allLinks.length, "links,", allButtons.length, "buttons");
-    console.log("📋 Available items:", allItems.slice(0, 20).join(" | "));
+    // Get available items from page
+    const allLinks = (page?.links || [])
+      .map(l => l.text)
+      .filter(t => t && t.length > 0 && t.length < 100);
+    
+    const allButtons = (page?.buttons || [])
+      .filter(t => t && t.length > 0 && t.length < 100);
+    
+    const allItems = [...new Set([...allLinks, ...allButtons])];
 
-    // Use OpenAI if available
-    if (openai) {
-      try {
-        console.log("🤖 Using OpenAI...");
+    console.log("📊 Available items:", allItems.length);
 
-        const systemPrompt = `You are a website navigation assistant. The user is on a webpage and wants help navigating it.
-
-PAGE INFORMATION:
-Title: ${page?.title || "Unknown"}
-URL: ${page?.url || "Unknown"}
-
-AVAILABLE LINKS AND BUTTONS:
-${allItems.slice(0, 50).join("\n")}
-
-USER QUERY: "${query}"
-
-INSTRUCTIONS:
-1. Understand what the user wants to do
-2. Find the BEST MATCHING link or button from the list above
-3. Return ONLY a JSON object, no other text
-
-RESPONSE FORMAT (choose ONE):
-- If user wants to navigate: {"action": "navigate", "target": "exact_text_from_list", "reason": "why this matches"}
-- If user asks a question: {"action": "explain", "answer": "helpful response based on available options"}
-
-MATCHING RULES:
-- "target" MUST be EXACT text from the available list above
-- Handle synonyms: "sign in" = "login", "my profile" = "account", "help center" = "support"
-- Be smart about partial matches: if user says "pricing" and you see "View Pricing Plans", use "View Pricing Plans"
-- If no good match exists, use "explain" action to list relevant options
-
-RESPOND ONLY WITH VALID JSON, NO MARKDOWN, NO EXPLANATION OUTSIDE JSON.`;
-
-        const response = await openai.chat.completions.create({
-          model: "gpt-3.5-turbo",
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: query }
-          ],
-          temperature: 0.3,
-          max_tokens: 300
-        });
-
-        const aiResponse = response.choices[0]?.message?.content?.trim();
-        console.log("🤖 AI Response:", aiResponse);
-
-        if (aiResponse) {
-          // Parse JSON response
-          let parsed;
-          try {
-            // Remove markdown code blocks if present
-            const cleaned = aiResponse.replace(/```json\n?|\n?```/g, '').trim();
-            parsed = JSON.parse(cleaned);
-          } catch (e) {
-            console.log("⚠️ Failed to parse AI JSON:", e.message);
-            throw e;
-          }
-
-          // Validate navigation target exists
-          if (parsed.action === "navigate" && parsed.target) {
-            // Check if target exists in our list (exact or close match)
-            const targetMatch = allItems.find(item => 
-              item.toLowerCase() === parsed.target.toLowerCase()
-            );
-
-            if (targetMatch) {
-              console.log("✅ AI matched:", targetMatch);
-              return res.json({
-                action: "navigate",
-                target: targetMatch,
-                reason: parsed.reason
-              });
-            } else {
-              // AI suggested something not in list, try fallback
-              console.log("⚠️ AI target not found, using fallback");
-              const fallback = fallbackMatch(query, allItems);
-              if (fallback) {
-                return res.json({
-                  action: "navigate",
-                  target: fallback
-                });
-              }
-            }
-          } else if (parsed.action === "explain") {
-            console.log("💬 AI explaining");
-            return res.json(parsed);
-          }
-        }
-      } catch (aiError) {
-        console.error("❌ OpenAI error:", aiError.message);
-        // Fall through to fallback
-      }
-    }
-
-    // Fallback: Use simple matching
-    console.log("🔄 Using fallback matching...");
-
-    // Clean query
-    let cleanQuery = query.toLowerCase()
-      .replace(/^(go to|navigate to|take me to|show me|open|find|where is|click|access|i want to|can you|please)\s+/i, '')
-      .replace(/\b(the|a|an|page|section|area)\b/g, '')
-      .trim();
-
-    console.log("🧹 Clean query:", cleanQuery);
-
-    const match = fallbackMatch(cleanQuery, allItems);
-
-    if (match) {
-      console.log("✅ Fallback matched:", match);
-      return res.json({
-        action: "navigate",
-        target: match
+    if (!openai) {
+      return res.status(503).json({
+        action: "explain",
+        answer: "⚠️ AI is not configured. Please add OPENAI_API_KEY to the .env file to enable intelligent responses."
       });
     }
 
-    // No match - provide helpful response
-    console.log("❌ No match found");
-    
-    if (query.toLowerCase().includes("what") || 
-        query.toLowerCase().includes("where") ||
-        query.toLowerCase().includes("help") ||
-        query.toLowerCase().includes("show me")) {
-      
+    // Determine page context
+    const pageContext = page?.title || page?.url || "this page";
+    const pageDescription = page?.title ? `on ${page.title}` : `at ${page.url}`;
+
+    // Build AI prompt
+    const systemPrompt = `You are an intelligent website navigation assistant chatbot. You help users by:
+1. ANSWERING their questions about the website
+2. NAVIGATING them to the right pages when they ask
+3. HAVING natural conversations
+4. UNDERSTANDING context and intent
+
+CURRENT PAGE CONTEXT:
+- Page: ${pageContext}
+- URL: ${page?.url || "Unknown"}
+- Available links/buttons on this page:
+${allItems.slice(0, 80).map((item, i) => `  ${i + 1}. ${item}`).join('\n')}
+
+IMPORTANT INSTRUCTIONS:
+
+When user wants to NAVIGATE (asks to "go to", "show me", "take me to", "open", "find"):
+- Respond with JSON: {"action": "navigate", "target": "EXACT_TEXT_FROM_LIST", "message": "Taking you to [destination]"}
+- The "target" MUST be EXACTLY one of the items from the list above (copy it precisely)
+- Be smart about matching: "pricing" can match "View Pricing Plans", "login" matches "Sign In", etc.
+
+When user asks QUESTIONS (asks "what", "how", "why", "explain", "tell me about"):
+- Respond with JSON: {"action": "explain", "answer": "Your helpful conversational response"}
+- Answer based on what's available ${pageDescription}
+- Be conversational and friendly
+- Provide useful information
+
+When user wants HELP or exploration:
+- Show them what's available on the page
+- Suggest relevant sections
+- Be helpful and guide them
+
+RESPONSE FORMAT - ALWAYS JSON:
+{"action": "navigate", "target": "exact text", "message": "friendly message"}
+OR
+{"action": "explain", "answer": "conversational response"}
+
+CRITICAL RULES:
+1. ALWAYS respond with valid JSON (no markdown, no extra text)
+2. For navigation, "target" must be EXACT text from the available list
+3. Be conversational and natural in messages
+4. Understand synonyms: "price" = "pricing" = "cost" = "plans"
+5. Be intelligent about matching: don't require exact keywords
+6. If unsure, ASK the user or suggest alternatives
+
+Remember: You're a smart assistant who understands context and can have real conversations!`;
+
+    // Build messages including history
+    const messages = [
+      { role: "system", content: systemPrompt }
+    ];
+
+    // Add conversation history (last 5 messages)
+    history.slice(-5).forEach(msg => {
+      messages.push({ role: msg.role, content: msg.content });
+    });
+
+    // Add current query
+    messages.push({ role: "user", content: query });
+
+    console.log("🧠 Sending to OpenAI with", messages.length, "messages...");
+
+    // Call OpenAI
+    const response = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: messages,
+      temperature: 0.7, // More creative for conversation
+      max_tokens: 500,
+      response_format: { type: "json_object" } // Force JSON response
+    });
+
+    const aiResponse = response.choices[0]?.message?.content?.trim();
+    console.log("🤖 AI Response:", aiResponse);
+
+    if (!aiResponse) {
+      throw new Error("Empty response from AI");
+    }
+
+    // Parse JSON response
+    let parsed;
+    try {
+      parsed = JSON.parse(aiResponse);
+    } catch (e) {
+      console.error("❌ Failed to parse JSON:", e.message);
+      console.log("Raw response:", aiResponse);
+      throw new Error("Invalid AI response format");
+    }
+
+    // Update conversation history
+    history.push({ role: "user", content: query });
+    history.push({ role: "assistant", content: aiResponse });
+    conversations.set(conversationId || Date.now().toString(), history);
+
+    // Validate and return response
+    if (parsed.action === "navigate") {
+      if (!parsed.target) {
+        console.log("⚠️ No target specified, converting to explanation");
+        return res.json({
+          action: "explain",
+          answer: parsed.message || "I'm not sure where to navigate. Can you be more specific?"
+        });
+      }
+
+      // Verify target exists (case-insensitive)
+      const targetExists = allItems.some(item => 
+        item.toLowerCase() === parsed.target.toLowerCase()
+      );
+
+      if (!targetExists) {
+        // Find closest match
+        const closest = allItems.find(item =>
+          item.toLowerCase().includes(parsed.target.toLowerCase()) ||
+          parsed.target.toLowerCase().includes(item.toLowerCase())
+        );
+
+        if (closest) {
+          console.log("✅ Found close match:", closest);
+          return res.json({
+            action: "navigate",
+            target: closest,
+            message: parsed.message || `Taking you to ${closest}`
+          });
+        }
+
+        console.log("⚠️ Target not found, returning explanation");
+        return res.json({
+          action: "explain",
+          answer: `I couldn't find "${parsed.target}" on this page. Available options: ${allItems.slice(0, 8).join(", ")}. Which one would you like?`
+        });
+      }
+
+      console.log("✅ Navigation:", parsed.target);
+      return res.json(parsed);
+    } 
+    else if (parsed.action === "explain") {
+      console.log("💬 Explanation provided");
+      return res.json(parsed);
+    }
+    else {
+      console.log("⚠️ Unknown action:", parsed.action);
       return res.json({
         action: "explain",
-        answer: `Available on this page: ${allItems.slice(0, 10).join(", ")}`
+        answer: parsed.answer || parsed.message || "I'm not sure how to help with that. Can you rephrase?"
       });
     }
-
-    return res.json({
-      action: "explain",
-      answer: `I couldn't find "${cleanQuery}". Available options: ${allItems.slice(0, 8).join(", ")}. Try asking about one of these.`
-    });
 
   } catch (err) {
     console.error("❌ Server error:", err);
+    
+    if (err.message.includes("API key")) {
+      return res.status(401).json({
+        action: "explain",
+        answer: "⚠️ OpenAI API key is invalid. Please check your .env file."
+      });
+    }
+
+    if (err.message.includes("quota")) {
+      return res.status(429).json({
+        action: "explain",
+        answer: "⚠️ OpenAI quota exceeded. Please check your OpenAI account billing."
+      });
+    }
+
     res.status(500).json({
       action: "explain",
-      answer: "Server error. Please try again."
+      answer: "Sorry, I encountered an error. Please try again."
     });
   }
 });
 
+// Clear conversation history endpoint
+app.post("/clear", (req, res) => {
+  const { conversationId } = req.body;
+  if (conversationId) {
+    conversations.delete(conversationId);
+  }
+  res.json({ success: true });
+});
+
 app.listen(port, () => {
-  console.log("=".repeat(60));
-  console.log("🚀 AI Website Navigator running at http://localhost:" + port);
-  console.log("🤖 AI Status:", openai ? "ENABLED ✅" : "DISABLED (fallback mode)");
-  console.log("=".repeat(60));
+  console.log("=".repeat(70));
+  console.log("🤖 TRUE AI CHATBOT SERVER");
+  console.log("🚀 Running at http://localhost:" + port);
+  console.log("🧠 AI Status:", openai ? "ENABLED ✅" : "DISABLED ❌");
+  console.log("💬 Mode:", openai ? "Intelligent Conversation + Navigation" : "Fallback");
+  console.log("=".repeat(70));
 });
