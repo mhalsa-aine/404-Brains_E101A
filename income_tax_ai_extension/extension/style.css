@@ -1,31 +1,32 @@
+/* RESET */
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   width: 350px;
   height: 500px;
+  font-family: system-ui, Arial, sans-serif;
   background: #0f172a;
   color: white;
-  font-family: system-ui, sans-serif;
 }
 
-.chat {
+/* MAIN APP */
+#app {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-header {
-  padding: 12px;
-  text-align: center;
-  background: linear-gradient(135deg, #2563eb, #1e40af);
-  font-weight: bold;
-}
-
+/* CHAT AREA */
 #chat-box {
   flex: 1;
   padding: 10px;
   overflow-y: auto;
 }
 
+/* MESSAGES */
 .msg {
   margin-bottom: 8px;
   padding: 8px 12px;
@@ -43,33 +44,40 @@ header {
   background: #1e293b;
 }
 
-.input {
+/* INPUT BAR */
+#input-bar {
   display: flex;
+  gap: 6px;
   padding: 8px;
   background: #020617;
 }
 
-input {
+/* 🔥 INPUT FIX — THIS IS CRITICAL */
+#user-input {
   flex: 1;
   padding: 8px 10px;
-  border-radius: 8px;
-  border: none;
-  outline: none;
-  background: #0f172a;
-  color: white;              /* ✅ FIX */
   font-size: 14px;
+
+  background: #020617;
+  color: white;
+
+  border: 1px solid #334155;
+  border-radius: 8px;
+
+  outline: none;
+  pointer-events: auto;   /* 🔴 FORCE ENABLE */
 }
 
-input::placeholder {
+#user-input::placeholder {
   color: #94a3b8;
 }
 
-button {
-  margin-left: 6px;
-  background: #2563eb;
-  border: none;
-  color: white;
+#send-btn {
   padding: 0 14px;
   border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: white;
   cursor: pointer;
 }
+

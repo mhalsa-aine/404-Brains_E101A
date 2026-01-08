@@ -1,51 +1,30 @@
-const box = document.getElementById("chat-box");
+const chatBox = document.getElementById("chat-box");
 const input = document.getElementById("user-input");
-const send = document.getElementById("send");
+const sendBtn = document.getElementById("send-btn");
 
-add("Hi! I can explain or navigate this website 😊", "bot");
+/* 🔥 FORCE INPUT TO BE ENABLED AND FOCUSED */
+input.disabled = false;
+input.focus();
 
-send.onclick = sendMsg;
-input.onkeydown = e => e.key === "Enter" && sendMsg();
+addMessage("Hi! Type something below 👇", "bot");
 
-function add(text, who) {
-  const d = document.createElement("div");
-  d.className = `msg ${who}`;
-  d.textContent = text;
-  box.appendChild(d);
-  box.scrollTop = box.scrollHeight;
+sendBtn.addEventListener("click", sendMessage);
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") sendMessage();
+});
+
+function addMessage(text, who) {
+  const div = document.createElement("div");
+  div.className = `msg ${who}`;
+  div.textContent = text;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-async function sendMsg() {
+function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
 
-  add(text, "user");
+  addMessage(text, "user");
   input.value = "";
-
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-  const page = await chrome.tabs.sendMessage(tab.id, { type: "GET_PAGE" });
-
-  const res = await chrome.runtime.sendMessage({
-    type: "AI_FETCH",
-    payload: { query: text, page }
-  });
-
-  if (!res.success) {
-    add("Server error", "bot");
-    return;
-  }
-
-  const ai = res.data;
-
-  if (ai.action === "navigate") {
-    add(ai.message || "Navigating...", "bot");
-    await chrome.tabs.sendMessage(tab.id, {
-      type: "PERFORM_ACTION",
-      target: ai.target
-    });
-  } else {
-    add(ai.answer, "bot");
-  }
 }
-
