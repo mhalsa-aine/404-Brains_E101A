@@ -1,45 +1,48 @@
+/* RESET EVERYTHING */
 * {
   box-sizing: border-box;
 }
 
+/* BODY */
 body {
   margin: 0;
   width: 360px;
   height: 520px;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont;
   background: #0f172a;
+  font-family: system-ui, Arial, sans-serif;
   color: white;
 }
 
-#app {
+/* MAIN CONTAINER */
+.container {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-/* Header */
-header {
+/* HEADER */
+.header {
   padding: 12px;
   text-align: center;
   font-weight: 600;
   background: linear-gradient(135deg, #2563eb, #1e40af);
+  flex-shrink: 0;
 }
 
-/* Chat area */
+/* CHAT AREA */
 #chat {
   flex: 1;
   padding: 12px;
   overflow-y: auto;
 }
 
-/* Message bubbles */
+/* MESSAGE BUBBLES */
 .msg {
   max-width: 85%;
   padding: 10px 14px;
   margin-bottom: 8px;
   border-radius: 14px;
   font-size: 14px;
-  line-height: 1.4;
 }
 
 .user {
@@ -51,29 +54,38 @@ header {
   background: #1e293b;
 }
 
-/* Input bar */
-#input-bar {
+/* INPUT BAR */
+.input-bar {
   display: flex;
   gap: 8px;
   padding: 10px;
   background: #020617;
+  flex-shrink: 0;
 }
 
+/* 🔥 INPUT — GUARANTEED TYPING */
 #input {
   flex: 1;
   padding: 10px 12px;
   font-size: 14px;
+
   background: #020617;
   color: white;
+
   border: 1px solid #334155;
   border-radius: 10px;
+
   outline: none;
+  pointer-events: auto;
+  z-index: 10;
 }
 
+/* PLACEHOLDER */
 #input::placeholder {
   color: #94a3b8;
 }
 
+/* SEND BUTTON */
 #send {
   background: #2563eb;
   border: none;
@@ -82,3 +94,4 @@ header {
   border-radius: 10px;
   cursor: pointer;
 }
+

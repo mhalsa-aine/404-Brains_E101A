@@ -2,14 +2,19 @@ const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 const send = document.getElementById("send");
 
+/* FORCE INPUT TO WORK */
+input.disabled = false;
+input.readOnly = false;
 input.focus();
 
-add("Hi! I’m your website assistant 👋", "bot");
+addMessage("Hi 👋 I’m your website assistant.", "bot");
 
-send.onclick = sendMessage;
-input.onkeydown = e => e.key === "Enter" && sendMessage();
+send.addEventListener("click", sendMessage);
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") sendMessage();
+});
 
-function add(text, who) {
+function addMessage(text, who) {
   const div = document.createElement("div");
   div.className = `msg ${who}`;
   div.textContent = text;
@@ -21,11 +26,12 @@ function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
 
-  add(text, "user");
+  addMessage(text, "user");
   input.value = "";
 
-  // TEMP bot echo (next step replaces this)
+  // Temporary response (AI will be added next)
   setTimeout(() => {
-    add("I understood: " + text, "bot");
-  }, 400);
+    addMessage("I understood: " + text, "bot");
+  }, 300);
 }
+

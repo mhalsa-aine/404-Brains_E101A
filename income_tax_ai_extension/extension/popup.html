@@ -6,20 +6,26 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="app">
-    <header>🤖 Website Assistant</header>
+
+  <div class="container">
+
+    <div class="header">
+      🤖 Website Assistant
+    </div>
 
     <div id="chat"></div>
 
-    <div id="input-bar">
+    <div class="input-bar">
       <input
         id="input"
         type="text"
-        placeholder="Ask or navigate…"
+        placeholder="Type your message..."
         autocomplete="off"
+        autofocus
       />
       <button id="send">➤</button>
     </div>
+
   </div>
 
   <script src="popup.js"></script>
