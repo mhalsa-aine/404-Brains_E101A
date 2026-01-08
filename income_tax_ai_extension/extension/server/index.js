@@ -8,7 +8,7 @@ dotenv.config();
 const app = express();
 const port = 3000;
 
-// Initialize OpenAI (optional - falls back to rules if not configured)
+// Initialize OpenAI
 let openai = null;
 if (process.env.OPENAI_API_KEY) {
   openai = new OpenAI({
@@ -16,7 +16,7 @@ if (process.env.OPENAI_API_KEY) {
   });
   console.log("✅ OpenAI API initialized");
 } else {
-  console.log("⚠️ No OpenAI API key found, using rule-based fallback");
+  console.log("⚠️ No OpenAI API key - using intelligent fallback");
 }
 
 app.use(cors());
@@ -29,7 +29,47 @@ app.get("/", (req, res) => {
   });
 });
 
-// Enhanced AI endpoint with OpenAI integration
+// Smart matching function
+function findBestMatch(query, availableItems) {
+  const q = query.toLowerCase();
+  const matches = [];
+
+  for (const item of availableItems) {
+    const itemLower = item.toLowerCase();
+    
+    // Exact match
+    if (itemLower === q) {
+      matches.push({ item, score: 100 });
+      continue;
+    }
+    
+    // Contains query
+    if (itemLower.includes(q)) {
+      matches.push({ item, score: 80 });
+      continue;
+    }
+    
+    // Query contains item
+    if (q.includes(itemLower)) {
+      matches.push({ item, score: 70 });
+      continue;
+    }
+    
+    // Word overlap
+    const queryWords = q.split(/\s+/);
+    const itemWords = itemLower.split(/\s+/);
+    const overlap = queryWords.filter(w => itemWords.some(iw => iw.includes(w) || w.includes(iw)));
+    
+    if (overlap.length > 0) {
+      matches.push({ item, score: 50 + (overlap.length * 10) });
+    }
+  }
+
+  matches.sort((a, b) => b.score - a.score);
+  return matches.length > 0 ? matches[0].item : null;
+}
+
+// Enhanced AI endpoint
 app.post("/ai", async (req, res) => {
   try {
     const { query, page } = req.body;
@@ -41,50 +81,91 @@ app.post("/ai", async (req, res) => {
       });
     }
 
-    console.log("Query:", query);
-    console.log("Page:", page?.title);
+    console.log("\n📝 Query:", query);
+    console.log("📄 Page:", page?.title);
+    console.log("🔗 Available links:", page?.links?.length || 0);
+    console.log("🔘 Available buttons:", page?.buttons?.length || 0);
 
-    // Try OpenAI first if available
+    const q = query.toLowerCase();
+
+    // Check if it's a navigation intent
+    const navigationWords = [
+      'go to', 'navigate to', 'take me to', 'show me', 'open', 
+      'find', 'where is', 'how to get to', 'click', 'access'
+    ];
+    
+    const isNavigationQuery = navigationWords.some(word => q.includes(word));
+    
+    // Try OpenAI if available
     if (openai) {
       try {
+        const linksList = page?.links?.slice(0, 30).map(l => l.text).join(", ") || "None";
+        const buttonsList = page?.buttons?.slice(0, 20).join(", ") || "None";
+        const headingsList = page?.headings?.slice(0, 10).join(", ") || "None";
+
         const response = await openai.chat.completions.create({
           model: "gpt-3.5-turbo",
           messages: [
             {
               role: "system",
-              content: `You are a website navigation assistant. Analyze the page structure and help users navigate or understand the website.
+              content: `You are a website navigation assistant. Analyze the page and help users.
 
-Page Information:
-- Title: ${page?.title || "Unknown"}
-- URL: ${page?.url || "Unknown"}
-- Available Links: ${page?.links?.map(l => l.text).join(", ") || "None"}
-- Available Buttons: ${page?.buttons?.join(", ") || "None"}
-- Headings: ${page?.headings?.join(", ") || "None"}
+Page: ${page?.title || "Unknown"}
+URL: ${page?.url || "Unknown"}
 
-Respond in JSON format with one of these actions:
-1. {"action": "navigate", "target": "keyword"} - to navigate to a specific section
-2. {"action": "explain", "answer": "your explanation"} - to explain something
+Available sections/links: ${linksList}
+Available buttons: ${buttonsList}
+Page headings: ${headingsList}
 
-Keep explanations concise and helpful.`
+User query: "${query}"
+
+Determine:
+1. If user wants to NAVIGATE somewhere - respond with: {"action": "navigate", "target": "exact_link_or_button_text_from_above", "explanation": "brief reason"}
+2. If user wants INFORMATION - respond with: {"action": "explain", "answer": "helpful explanation based on what's available on this page"}
+
+Rules:
+- For navigation, "target" MUST be exact text from available links/buttons above
+- Be smart about synonyms (e.g., "sign in" = "login", "my account" = "profile")
+- If exact match not found, use closest related link
+- Keep explanations under 100 words`
             },
             {
               role: "user",
               content: query
             }
           ],
-          temperature: 0.7,
-          max_tokens: 200
+          temperature: 0.3,
+          max_tokens: 250
         });
 
         const aiResponse = response.choices[0]?.message?.content;
+        console.log("🤖 AI Response:", aiResponse);
         
         if (aiResponse) {
-          // Try to parse JSON response
           try {
-            const parsed = JSON.parse(aiResponse);
+            const parsed = JSON.parse(aiResponse.replace(/```json\n?|\n?```/g, ''));
+            
+            // Validate the target exists
+            if (parsed.action === "navigate" && parsed.target) {
+              const allItems = [
+                ...(page?.links?.map(l => l.text) || []),
+                ...(page?.buttons || [])
+              ].filter(Boolean);
+              
+              const bestMatch = findBestMatch(parsed.target, allItems);
+              
+              if (bestMatch) {
+                return res.json({
+                  action: "navigate",
+                  target: bestMatch,
+                  explanation: parsed.explanation
+                });
+              }
+            }
+            
             return res.json(parsed);
-          } catch {
-            // If not JSON, treat as explanation
+          } catch (parseError) {
+            console.log("Failed to parse AI JSON, treating as explanation");
             return res.json({
               action: "explain",
               answer: aiResponse
@@ -93,70 +174,80 @@ Keep explanations concise and helpful.`
         }
       } catch (aiError) {
         console.error("OpenAI error:", aiError.message);
-        // Fall through to rule-based system
+        // Fall through to intelligent fallback
       }
     }
 
-    // Rule-based fallback
-    const q = query.toLowerCase();
+    // INTELLIGENT FALLBACK SYSTEM
+    console.log("Using intelligent fallback...");
 
-    // Navigation rules
-    const navigationRules = [
-      { keywords: ["login", "sign in", "log in"], target: "login" },
-      { keywords: ["register", "sign up", "create account"], target: "register" },
-      { keywords: ["profile", "account", "my account"], target: "profile" },
-      { keywords: ["dashboard", "home"], target: "dashboard" },
-      { keywords: ["contact", "contact us", "get in touch"], target: "contact" },
-      { keywords: ["help", "support", "faq"], target: "help" },
-      { keywords: ["about", "about us"], target: "about" },
-      { keywords: ["cart", "shopping cart", "basket"], target: "cart" },
-      { keywords: ["checkout", "pay", "payment"], target: "checkout" },
-      { keywords: ["search"], target: "search" }
-    ];
+    // Extract intent and keywords from query
+    let extractedKeywords = q
+      .replace(/^(go to|navigate to|take me to|show me|open|find|where is|how to get to|click|access)\s+/i, '')
+      .replace(/\b(the|a|an|page|section|area)\b/g, '')
+      .trim();
 
-    for (const rule of navigationRules) {
-      if (rule.keywords.some(keyword => q.includes(keyword))) {
-        return res.json({
-          action: "navigate",
-          target: rule.target
-        });
-      }
+    console.log("🔍 Extracted keywords:", extractedKeywords);
+
+    // Get all available navigation items
+    const allLinks = (page?.links || []).map(l => l.text).filter(Boolean);
+    const allButtons = (page?.buttons || []).filter(Boolean);
+    const allItems = [...allLinks, ...allButtons];
+
+    console.log("🎯 Searching in:", allItems);
+
+    // Try to find best match
+    const bestMatch = findBestMatch(extractedKeywords, allItems);
+
+    if (bestMatch) {
+      console.log("✅ Found match:", bestMatch);
+      return res.json({
+        action: "navigate",
+        target: bestMatch
+      });
     }
 
-    // Information queries
-    if (q.includes("what") || q.includes("where") || q.includes("how")) {
-      const pageInfo = [];
+    // If no match found but it's a navigation query
+    if (isNavigationQuery) {
+      const suggestions = allItems.slice(0, 5).join(", ");
+      return res.json({
+        action: "explain",
+        answer: `I couldn't find "${extractedKeywords}" on this page. Available sections include: ${suggestions}. Try asking about one of these.`
+      });
+    }
+
+    // Information query
+    if (q.includes("what") || q.includes("where") || q.includes("how") || q.includes("which")) {
+      const info = [];
       
       if (page?.title) {
-        pageInfo.push(`This is the "${page.title}" page.`);
+        info.push(`You're on the "${page.title}" page.`);
       }
       
-      if (page?.links?.length > 0) {
-        const topLinks = page.links.slice(0, 5).map(l => l.text).join(", ");
-        pageInfo.push(`Available sections: ${topLinks}`);
+      if (allLinks.length > 0) {
+        const topLinks = allLinks.slice(0, 8).join(", ");
+        info.push(`Available sections: ${topLinks}`);
       }
       
-      if (page?.buttons?.length > 0) {
-        const topButtons = page.buttons.slice(0, 3).join(", ");
-        pageInfo.push(`Actions available: ${topButtons}`);
+      if (allButtons.length > 0) {
+        const topButtons = allButtons.slice(0, 5).join(", ");
+        info.push(`Actions: ${topButtons}`);
       }
 
       return res.json({
         action: "explain",
-        answer: pageInfo.length > 0 
-          ? pageInfo.join(" ") 
-          : "I can help you navigate this website. Try asking me to go to login, profile, or any section you see."
+        answer: info.join(" ")
       });
     }
 
-    // Default response
+    // General query - try to be helpful
     return res.json({
       action: "explain",
-      answer: "I can help you navigate this website. Try asking me to 'go to login' or 'show me the contact page'."
+      answer: `I can help you navigate this page. Available options: ${allItems.slice(0, 6).join(", ")}. What would you like to do?`
     });
 
   } catch (err) {
-    console.error("Server error:", err);
+    console.error("❌ Server error:", err);
     res.status(500).json({
       action: "explain",
       answer: "Internal server error. Please try again."
@@ -166,4 +257,5 @@ Keep explanations concise and helpful.`
 
 app.listen(port, () => {
   console.log(`🚀 AI server running at http://localhost:${port}`);
+  console.log(`📊 OpenAI: ${openai ? 'Enabled' : 'Disabled (using smart fallback)'}`);
 });

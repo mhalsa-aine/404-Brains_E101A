@@ -4,24 +4,41 @@
 
   function extractPageStructure() {
     try {
+      // Get all interactive elements
+      const links = [...document.querySelectorAll("a")]
+        .map(a => ({
+          text: (a.innerText || a.textContent || a.getAttribute("aria-label") || "").trim(),
+          href: a.href
+        }))
+        .filter(l => l.text && l.text.length > 0 && l.text.length < 100)
+        .slice(0, 100);
+
+      const buttons = [
+        ...document.querySelectorAll("button, input[type='button'], input[type='submit'], [role='button'], .btn, .button")
+      ]
+        .map(b => (b.innerText || b.textContent || b.value || b.getAttribute("aria-label") || "").trim())
+        .filter(Boolean)
+        .filter(t => t.length > 0 && t.length < 100)
+        .slice(0, 50);
+
+      const headings = [...document.querySelectorAll("h1, h2, h3, h4")]
+        .map(h => h.innerText.trim())
+        .filter(Boolean)
+        .slice(0, 30);
+
+      // Get navigation menus
+      const navItems = [...document.querySelectorAll("nav a, [role='navigation'] a, .nav a, .menu a")]
+        .map(a => (a.innerText || a.textContent || "").trim())
+        .filter(Boolean)
+        .slice(0, 30);
+
       const structure = {
         title: document.title || "Untitled",
         url: location.href,
-        headings: [...document.querySelectorAll("h1, h2, h3")]
-          .map(h => h.innerText.trim())
-          .filter(Boolean)
-          .slice(0, 20),
-        links: [...document.querySelectorAll("a")]
-          .map(a => ({
-            text: a.innerText.trim(),
-            href: a.href
-          }))
-          .filter(l => l.text && l.text.length > 0)
-          .slice(0, 50),
-        buttons: [...document.querySelectorAll("button, input[type='button'], input[type='submit'], a.btn, .button")]
-          .map(b => b.innerText.trim() || b.value || b.getAttribute("aria-label") || "")
-          .filter(Boolean)
-          .slice(0, 20),
+        headings: headings,
+        links: links,
+        buttons: [...new Set(buttons)], // Remove duplicates
+        navItems: [...new Set(navItems)], // Remove duplicates
         forms: [...document.querySelectorAll("form")].map(f => ({
           action: f.action,
           method: f.method,
@@ -29,7 +46,8 @@
             .map(i => ({
               type: i.type,
               name: i.name,
-              placeholder: i.placeholder
+              placeholder: i.placeholder,
+              label: i.labels?.[0]?.innerText || ""
             }))
         })).slice(0, 5)
       };
@@ -38,7 +56,8 @@
         title: structure.title,
         linkCount: structure.links.length,
         buttonCount: structure.buttons.length,
-        headingCount: structure.headings.length
+        headingCount: structure.headings.length,
+        navItemCount: structure.navItems.length
       });
       
       return structure;
@@ -50,6 +69,7 @@
         headings: [],
         links: [],
         buttons: [],
+        navItems: [],
         forms: []
       };
     }
@@ -79,43 +99,74 @@
       const target = req.target.toLowerCase();
       console.log("🎯 Performing action for target:", target);
 
-      // Find matching link
-      const link = [...document.querySelectorAll("a")].find(a => 
-        a.innerText.toLowerCase().includes(target) ||
-        a.href.toLowerCase().includes(target)
-      );
+      // Search all possible elements
+      const allElements = [
+        ...document.querySelectorAll("a, button, input[type='button'], input[type='submit'], [role='button'], .btn, .button")
+      ];
 
-      if (link) {
-        link.style.outline = "3px solid #007bff";
-        link.style.outlineOffset = "2px";
-        link.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Find best match
+      let bestMatch = null;
+      let bestScore = 0;
+
+      for (const el of allElements) {
+        const text = (el.innerText || el.textContent || el.value || el.getAttribute("aria-label") || "").toLowerCase();
+        
+        if (!text) continue;
+
+        // Exact match
+        if (text === target) {
+          bestMatch = el;
+          bestScore = 100;
+          break;
+        }
+
+        // Contains match
+        if (text.includes(target)) {
+          const score = 80;
+          if (score > bestScore) {
+            bestMatch = el;
+            bestScore = score;
+          }
+        }
+
+        // Reverse contains
+        if (target.includes(text)) {
+          const score = 70;
+          if (score > bestScore) {
+            bestMatch = el;
+            bestScore = score;
+          }
+        }
+
+        // Word overlap
+        const targetWords = target.split(/\s+/);
+        const textWords = text.split(/\s+/);
+        const overlap = targetWords.filter(w => textWords.some(tw => tw.includes(w) || w.includes(tw)));
+        
+        if (overlap.length > 0) {
+          const score = 50 + (overlap.length * 10);
+          if (score > bestScore) {
+            bestMatch = el;
+            bestScore = score;
+          }
+        }
+      }
+
+      if (bestMatch && bestScore > 40) {
+        console.log("✅ Found match:", bestMatch.innerText || bestMatch.value, "Score:", bestScore);
+        
+        bestMatch.style.outline = "3px solid #007bff";
+        bestMatch.style.outlineOffset = "2px";
+        bestMatch.scrollIntoView({ behavior: "smooth", block: "center" });
         
         setTimeout(() => {
-          link.click();
+          bestMatch.click();
         }, 500);
         
-        sendResponse({ success: true });
+        sendResponse({ success: true, matched: bestMatch.innerText || bestMatch.value });
       } else {
-        // Try buttons
-        const button = [...document.querySelectorAll("button, input[type='button'], input[type='submit'], a.btn, .button")]
-          .find(b => 
-            (b.innerText || b.value || "").toLowerCase().includes(target)
-          );
-
-        if (button) {
-          button.style.outline = "3px solid #007bff";
-          button.style.outlineOffset = "2px";
-          button.scrollIntoView({ behavior: "smooth", block: "center" });
-          
-          setTimeout(() => {
-            button.click();
-          }, 500);
-          
-          sendResponse({ success: true });
-        } else {
-          console.log("❌ Element not found for target:", target);
-          sendResponse({ success: false, message: "Element not found" });
-        }
+        console.log("❌ No good match found for:", target);
+        sendResponse({ success: false, message: "Element not found" });
       }
       
       return true;
