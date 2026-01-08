@@ -249,18 +249,60 @@ Rules:
     const allButtons = (page?.buttons || []).filter(Boolean);
     const allNavItems = (page?.navItems || []).filter(Boolean);
     
-    // Combine all items, prioritizing nav items and common patterns
+    // Aggressive filter function to remove junk
+    const isCleanText = (text) => {
+      if (!text || typeof text !== 'string') return false;
+      text = text.trim();
+      
+      // Basic filters
+      if (text.length === 0 || text.length > 100) return false;
+      
+      // Multi-line = likely code
+      if (text.split('\n').length > 2) return false;
+      
+      // Normalize whitespace for checking
+      const normalized = text.replace(/\s+/g, ' ').toLowerCase();
+      
+      // Filter CSS/code patterns
+      const badPatterns = [
+        '{', '}', 'fill:', 'rgba', 'rgb(', 'cls-', 'shp',
+        'white-space', 'tspan', 'prefix__', 'xmlns',
+        'opacity:', 'display:', 'px;', 'em;', 'none;',
+        'stroke:', 'transform:', 'viewbox', 'path d='
+      ];
+      
+      if (badPatterns.some(pattern => normalized.includes(pattern))) {
+        console.log(`  ❌ Filtered out (contains "${badPatterns.find(p => normalized.includes(p))}"): "${text.substring(0, 50)}..."`);
+        return false;
+      }
+      
+      // Must have at least 2 letters
+      if (!/[a-zA-Z]{2,}/.test(text)) return false;
+      
+      // Filter style/script keywords
+      if (/^(function|var|const|let|return|if|else)\s/i.test(text)) return false;
+      
+      return true;
+    };
+    
+    // Combine and clean all items
+    const cleanedLinks = allLinks.filter(isCleanText);
+    const cleanedButtons = allButtons.filter(isCleanText);
+    const cleanedNavItems = allNavItems.filter(isCleanText);
+    
+    console.log(`🧹 Cleaned: ${allLinks.length}→${cleanedLinks.length} links, ${allButtons.length}→${cleanedButtons.length} buttons, ${allNavItems.length}→${cleanedNavItems.length} nav`);
+    
     const allItems = [
-      ...allNavItems,
-      ...allButtons,
-      ...allLinks
+      ...cleanedNavItems,
+      ...cleanedButtons,
+      ...cleanedLinks
     ];
     
     // Remove duplicates while preserving order
     const uniqueItems = [...new Set(allItems)];
 
-    console.log("🎯 Total unique items to search:", uniqueItems.length);
-    console.log("📋 Sample items:", uniqueItems.slice(0, 10).join(", "));
+    console.log("🎯 Total unique clean items:", uniqueItems.length);
+    console.log("📋 Clean sample:", uniqueItems.slice(0, 10).join(" | "));
 
     // Try to find best match
     const bestMatch = findBestMatch(extractedKeywords, uniqueItems);

@@ -46,32 +46,82 @@
 
   function extractPageStructure() {
     try {
-      // Get all interactive elements
+      // Helper function to check if text is valid
+      const isValidText = (text) => {
+        if (!text || typeof text !== 'string') return false;
+        text = text.trim();
+        
+        // Filter out obvious junk
+        if (text.length === 0 || text.length > 100) return false;
+        
+        // Filter out multi-line text (likely code blocks)
+        if (text.split('\n').length > 2) return false;
+        
+        // Filter out CSS/code patterns (now handles newlines)
+        const normalized = text.replace(/\s+/g, ' ').toLowerCase();
+        
+        if (normalized.includes('{') || normalized.includes('}')) return false;
+        if (normalized.includes('fill:') || normalized.includes('stroke:')) return false;
+        if (normalized.includes('rgba') || normalized.includes('rgb(')) return false;
+        if (normalized.includes('cls-') || normalized.includes('shp')) return false;
+        if (normalized.includes('white-space') || normalized.includes('tspan')) return false;
+        if (normalized.includes('prefix__') || normalized.includes('xmlns')) return false;
+        if (normalized.includes('opacity:') || normalized.includes('display:')) return false;
+        if (normalized.includes('px;') || normalized.includes('em;')) return false;
+        
+        // Filter out style/script-like content
+        if (/\.(cls|shp|prefix)[0-9_-]/.test(normalized)) return false;
+        if (/fill\s*:\s*[#a-f0-9rgba(),.\s]+/i.test(normalized)) return false;
+        if (/[a-z-]+\s*:\s*[^;{]+[;{]/i.test(normalized)) return false;
+        
+        // Must contain at least one meaningful word (2+ letters)
+        if (!/[a-zA-Z]{2,}/.test(text)) return false;
+        
+        // Filter out just punctuation or special chars
+        if (/^[^a-zA-Z0-9\s]+$/.test(text)) return false;
+        
+        // Filter out obvious non-navigation text
+        const lowText = text.toLowerCase();
+        if (lowText.startsWith('function') || lowText.startsWith('var ')) return false;
+        if (lowText.startsWith('const ') || lowText.startsWith('let ')) return false;
+        
+        return true;
+      };
+
+      // Get all interactive elements, excluding style/script/svg containers
+      const skipSelectors = 'style, script, noscript, svg, [class*="style"], [class*="css"]';
+      
       const links = [...document.querySelectorAll("a")]
-        .map(a => ({
-          text: (a.innerText || a.textContent || a.getAttribute("aria-label") || "").trim(),
-          href: a.href
-        }))
-        .filter(l => l.text && l.text.length > 0 && l.text.length < 100)
+        .filter(a => !a.closest(skipSelectors))
+        .map(a => {
+          const text = (a.innerText || a.textContent || a.getAttribute("aria-label") || "").trim();
+          return {
+            text: text,
+            href: a.href
+          };
+        })
+        .filter(l => l && isValidText(l.text))
         .slice(0, 100);
 
       const buttons = [
         ...document.querySelectorAll("button, input[type='button'], input[type='submit'], [role='button'], .btn, .button")
       ]
+        .filter(b => !b.closest(skipSelectors))
         .map(b => (b.innerText || b.textContent || b.value || b.getAttribute("aria-label") || "").trim())
-        .filter(Boolean)
-        .filter(t => t.length > 0 && t.length < 100)
+        .filter(t => isValidText(t))
         .slice(0, 50);
 
       const headings = [...document.querySelectorAll("h1, h2, h3, h4")]
+        .filter(h => !h.closest(skipSelectors))
         .map(h => h.innerText.trim())
-        .filter(Boolean)
+        .filter(t => isValidText(t))
         .slice(0, 30);
 
       // Get navigation menus
-      const navItems = [...document.querySelectorAll("nav a, [role='navigation'] a, .nav a, .menu a")]
+      const navItems = [...document.querySelectorAll("nav a, [role='navigation'] a, .nav a, .menu a, header a")]
+        .filter(a => !a.closest(skipSelectors))
         .map(a => (a.innerText || a.textContent || "").trim())
-        .filter(Boolean)
+        .filter(t => isValidText(t))
         .slice(0, 30);
 
       const structure = {
@@ -79,8 +129,8 @@
         url: location.href,
         headings: headings,
         links: links,
-        buttons: [...new Set(buttons)], // Remove duplicates
-        navItems: [...new Set(navItems)], // Remove duplicates
+        buttons: [...new Set(buttons)],
+        navItems: [...new Set(navItems)],
         forms: [...document.querySelectorAll("form")].map(f => ({
           action: f.action,
           method: f.method,
@@ -99,7 +149,8 @@
         linkCount: structure.links.length,
         buttonCount: structure.buttons.length,
         headingCount: structure.headings.length,
-        navItemCount: structure.navItems.length
+        navItemCount: structure.navItems.length,
+        sampleLinks: structure.links.slice(0, 5).map(l => l.text)
       });
       
       return structure;
