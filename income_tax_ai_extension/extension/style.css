@@ -1,9 +1,7 @@
-/* RESET EVERYTHING */
 * {
   box-sizing: border-box;
 }
 
-/* BODY */
 body {
   margin: 0;
   width: 360px;
@@ -13,14 +11,12 @@ body {
   color: white;
 }
 
-/* MAIN CONTAINER */
 .container {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-/* HEADER */
 .header {
   padding: 12px;
   text-align: center;
@@ -29,20 +25,19 @@ body {
   flex-shrink: 0;
 }
 
-/* CHAT AREA */
 #chat {
   flex: 1;
   padding: 12px;
   overflow-y: auto;
 }
 
-/* MESSAGE BUBBLES */
 .msg {
   max-width: 85%;
   padding: 10px 14px;
   margin-bottom: 8px;
   border-radius: 14px;
   font-size: 14px;
+  line-height: 1.4;
 }
 
 .user {
@@ -54,7 +49,6 @@ body {
   background: #1e293b;
 }
 
-/* INPUT BAR */
 .input-bar {
   display: flex;
   gap: 8px;
@@ -63,29 +57,17 @@ body {
   flex-shrink: 0;
 }
 
-/* 🔥 INPUT — GUARANTEED TYPING */
 #input {
   flex: 1;
   padding: 10px 12px;
   font-size: 14px;
-
   background: #020617;
   color: white;
-
   border: 1px solid #334155;
   border-radius: 10px;
-
   outline: none;
-  pointer-events: auto;
-  z-index: 10;
 }
 
-/* PLACEHOLDER */
-#input::placeholder {
-  color: #94a3b8;
-}
-
-/* SEND BUTTON */
 #send {
   background: #2563eb;
   border: none;

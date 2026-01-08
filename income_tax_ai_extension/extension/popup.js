@@ -2,14 +2,17 @@ const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 const send = document.getElementById("send");
 
-input.focus();
+/* INITIAL FOCUS — SAFE */
+setTimeout(() => input.focus(), 50);
 
-add("Hi 👋 I can navigate and explain this website.", "bot");
+addMessage("Hi 👋 I can navigate and explain this website.", "bot");
 
-send.onclick = sendMessage;
-input.onkeydown = e => e.key === "Enter" && sendMessage();
+send.addEventListener("click", onSend);
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") onSend();
+});
 
-function add(text, who) {
+function addMessage(text, who) {
   const div = document.createElement("div");
   div.className = `msg ${who}`;
   div.textContent = text;
@@ -17,12 +20,15 @@ function add(text, who) {
   chat.scrollTop = chat.scrollHeight;
 }
 
-async function sendMessage() {
+async function onSend() {
   const text = input.value.trim();
   if (!text) return;
 
-  add(text, "user");
+  addMessage(text, "user");
   input.value = "";
+
+  // IMPORTANT: refocus immediately
+  input.focus();
 
   const [tab] = await chrome.tabs.query({
     active: true,
@@ -33,34 +39,39 @@ async function sendMessage() {
     type: "GET_PAGE"
   });
 
-  add("Thinking…", "bot");
+  addMessage("Thinking…", "bot");
 
   const res = await chrome.runtime.sendMessage({
     type: "AI_FETCH",
     payload: { query: text, page }
   });
 
+  // remove "Thinking..."
   chat.lastChild.remove();
 
   if (!res.success) {
-    add("Server error", "bot");
+    addMessage("Server error.", "bot");
+    input.focus();
     return;
   }
 
   const ai = res.data;
 
   if (ai.action === "navigate") {
-    add(ai.message || "Navigating…", "bot");
+    addMessage(ai.message || "Navigating…", "bot");
 
     await chrome.tabs.sendMessage(tab.id, {
       type: "PERFORM_ACTION",
       target: ai.target
     });
 
-    if (ai.answer) add(ai.answer, "bot");
+    if (ai.answer) addMessage(ai.answer, "bot");
   } else {
-    add(ai.answer, "bot");
+    addMessage(ai.answer, "bot");
   }
+
+  // 🔥 FINAL GUARANTEE
+  input.focus();
 }
 
 
