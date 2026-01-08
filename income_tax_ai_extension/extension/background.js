@@ -7,15 +7,22 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       },
       body: JSON.stringify(request.payload)
     })
-      .then(res => res.json())
-      .then(data => {
+      .then(async (res) => {
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text);
+        }
+        return res.json();
+      })
+      .then((data) => {
         sendResponse({ success: true, data });
       })
-      .catch(err => {
-        sendResponse({ success: false });
+      .catch((err) => {
+        sendResponse({ success: false, error: err.message });
       });
 
-    // REQUIRED for async response
+    // 🔴 REQUIRED for async response
     return true;
   }
 });
+

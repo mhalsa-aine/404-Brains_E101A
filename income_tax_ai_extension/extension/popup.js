@@ -3,6 +3,7 @@ const input = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 
 input.disabled = false;
+input.focus();
 
 sendBtn.addEventListener("click", sendMessage);
 input.addEventListener("keydown", (e) => {
@@ -23,10 +24,11 @@ function sendMessage() {
 
   addMessage(text, "user");
   input.value = "";
+  input.focus();
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     if (!tabs || !tabs[0]) {
-      addMessage("No active website detected.", "bot");
+      addMessage("⚠️ No active tab.", "bot");
       return;
     }
 
@@ -34,12 +36,12 @@ function sendMessage() {
       tabs[0].id,
       { type: "GET_PAGE_STRUCTURE" },
       (pageData) => {
-
         if (chrome.runtime.lastError || !pageData) {
-          addMessage("⚠️ Open a normal website (not chrome:// pages).", "bot");
+          addMessage("⚠️ Cannot read this page.", "bot");
           return;
         }
 
+        // 🔥 SEND TO BACKGROUND, NOT FETCH DIRECTLY
         chrome.runtime.sendMessage(
           {
             type: "AI_FETCH",
@@ -50,14 +52,27 @@ function sendMessage() {
           },
           (response) => {
             if (!response || !response.success) {
-              addMessage("Server error.", "bot");
+              addMessage("❌ AI server error.", "bot");
               return;
             }
 
-            addMessage(response.data.answer, "bot");
+            const ai = response.data;
+
+            if (ai.action === "navigate" && ai.target) {
+              addMessage(`Navigating to ${ai.target}…`, "bot");
+              chrome.tabs.sendMessage(tabs[0].id, {
+                type: "PERFORM_ACTION",
+                target: ai.target
+              });
+            } else if (ai.action === "explain" && ai.answer) {
+              addMessage(ai.answer, "bot");
+            } else {
+              addMessage("⚠️ I didn’t understand that.", "bot");
+            }
           }
         );
       }
     );
   });
 }
+
