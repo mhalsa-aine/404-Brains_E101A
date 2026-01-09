@@ -1,10 +1,10 @@
 // ⚠️ PUT YOUR GROQ API KEY HERE (between the quotes)
 // Example: const GROQ_API_KEY = "gsk_abc123def456...";
-const GROQ_API_KEY = "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"; // Get from: https://console.groq.com/keys
+const GROQ_API_KEY = "gsk_4iyTtEhqerzzJKsZ75aVWGdyb3FYccGYE.....g"; // Get from: https://console.groq.com/keys
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
 // Validate API key on load
-if (GROQ_API_KEY === "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" || !GROQ_API_KEY.startsWith("gsk_")) {
+if (GROQ_API_KEY === "gsk_4iyTtEhqerzzJKsZ75aVWGdyb3FYccGYET....." || !GROQ_API_KEY.startsWith("gsk_")) {
   console.error("🚨 CRITICAL: Invalid or missing GROQ_API_KEY in background.js!");
   console.error("Current key:", GROQ_API_KEY);
   console.error("Please update line 3 with your actual Groq API key from https://console.groq.com/keys");
@@ -433,3 +433,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   console.log("🗑️ Cleaned up history for closed tab:", tabId);
 
 });
+
