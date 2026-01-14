@@ -2,10 +2,38 @@ const chatBox = document.getElementById("chat-box");
 const input = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 const clearBtn = document.getElementById("clear-btn");
+const settingsBtn = document.getElementById("settings-btn");
 const statusText = document.getElementById("status-text");
+const statusDot = document.getElementById("status-dot");
 
-// Welcome message
-addMessage("👋 Hello! I'm your AI navigation assistant powered by Groq.\n\nTry:\n• 'Take me to the home page'\n• 'What can I do here?'\n• 'Click the login button'", "bot");
+// Check API key on load
+let hasApiKey = false;
+
+async function checkApiKey() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'GET_API_KEY' });
+    hasApiKey = !!response.apiKey;
+    
+    if (!hasApiKey) {
+      statusDot.classList.add('warning');
+      statusText.textContent = "⚠️ API key not configured";
+      addMessage("⚠️ Welcome! To get started:\n\n1. Click the ⚙️ settings icon (top right)\n2. Get your FREE API key from Groq\n3. Paste it in settings\n4. Start chatting!\n\nGroq offers generous free tier with fast AI responses.", "bot", false, true);
+    } else {
+      statusDot.classList.remove('warning');
+      statusText.textContent = "Ready to help you navigate";
+      addMessage("👋 Hello! I'm your AI navigation assistant powered by Groq.\n\nTry:\n• 'Take me to the home page'\n• 'What can I do here?'\n• 'Click the login button'", "bot");
+    }
+  } catch (error) {
+    console.error("Failed to check API key:", error);
+  }
+}
+
+checkApiKey();
+
+// Settings button
+settingsBtn.addEventListener("click", () => {
+  window.location.href = 'settings.html';
+});
 
 sendBtn.addEventListener("click", sendMessage);
 input.addEventListener("keydown", (e) => {
@@ -19,10 +47,11 @@ if (clearBtn) {
   clearBtn.addEventListener("click", clearConversation);
 }
 
-function addMessage(text, sender, isError = false) {
+function addMessage(text, sender, isError = false, isWarning = false) {
   const msg = document.createElement("div");
   msg.className = `message ${sender}`;
   if (isError) msg.classList.add("error");
+  if (isWarning) msg.classList.add("warning");
   
   // Convert markdown-style formatting and preserve line breaks
   let formattedText = text
@@ -72,7 +101,11 @@ function updateStatus(text, isError = false) {
     
     // Reset after 3 seconds
     setTimeout(() => {
-      statusText.textContent = "Ready to help you navigate";
+      if (hasApiKey) {
+        statusText.textContent = "Ready to help you navigate";
+      } else {
+        statusText.textContent = "⚠️ API key not configured";
+      }
       statusText.style.color = "#718096";
     }, 3000);
   }
@@ -81,6 +114,15 @@ function updateStatus(text, isError = false) {
 async function sendMessage() {
   const text = input.value.trim();
   if (!text) return;
+  
+  // Check if API key is configured
+  if (!hasApiKey) {
+    addMessage("⚠️ Please configure your API key first! Click the ⚙️ settings icon.", "bot", false, true);
+    updateStatus("API key required", true);
+    // Prompt to recheck
+    setTimeout(checkApiKey, 100);
+    return;
+  }
   
   addMessage(text, "user");
   input.value = "";
@@ -180,15 +222,24 @@ async function sendMessage() {
     } catch (error) {
       console.error("❌ AI query failed:", error);
       removeTypingIndicator();
-      addMessage("❌ Failed to get AI response. Check your API key in background.js", "bot", true);
+      addMessage("❌ Failed to get AI response. Please check your API key in settings.", "bot", true);
       updateStatus("AI query failed", true);
       return;
     }
     
     removeTypingIndicator();
     
+    // Check if user needs to set up API key
+    if (aiResponse && aiResponse.needsSetup) {
+      hasApiKey = false;
+      statusDot.classList.add('warning');
+      addMessage("⚠️ Please set up your Groq API key in settings first! Click the ⚙️ icon.", "bot", false, true);
+      updateStatus("API key required", true);
+      return;
+    }
+    
     if (!aiResponse || !aiResponse.success) {
-      addMessage(aiResponse?.reply || "❌ AI service error. Please check your Groq API key.", "bot", true);
+      addMessage(aiResponse?.reply || "❌ AI service error. Please check your API key in settings.", "bot", true);
       updateStatus("AI error", true);
       return;
     }
@@ -328,7 +379,16 @@ async function sendMessage() {
 async function clearConversation() {
   // Clear visual chat
   chatBox.innerHTML = "";
-  addMessage("🔄 Conversation cleared! Starting fresh.", "bot");
+  
+  // Re-check API key and show appropriate welcome message
+  const response = await chrome.runtime.sendMessage({ type: 'GET_API_KEY' });
+  hasApiKey = !!response.apiKey;
+  
+  if (!hasApiKey) {
+    addMessage("⚠️ Welcome! Please configure your API key in settings (⚙️ icon) to get started.", "bot", false, true);
+  } else {
+    addMessage("🔄 Conversation cleared! Starting fresh.", "bot");
+  }
   
   // Clear backend history
   try {
@@ -343,4 +403,4 @@ async function clearConversation() {
 // Auto-focus input on popup open
 window.addEventListener("load", () => {
   input.focus();
-});
+})

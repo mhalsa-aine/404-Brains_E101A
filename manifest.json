@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "AI Website Navigation Assistant",
-  "version": "2.0",
+  "version": "2.1",
   "description": "Smart assistant that helps you navigate and understand websites",
   "permissions": [
     "activeTab",
     "scripting",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"

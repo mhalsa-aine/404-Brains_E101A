@@ -1,14 +1,5 @@
-// ⚠️ PUT YOUR GROQ API KEY HERE (between the quotes)
-// Example: const GROQ_API_KEY = "gsk_abc123def456...";
-const GROQ_API_KEY = "gsk_4iyTtEhqerzzJKsZ75aVWGdyb3FYccGYE.....g"; // Get from: https://console.groq.com/keys
+// NO HARDCODED API KEY! Users provide their own
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-
-// Validate API key on load
-if (GROQ_API_KEY === "gsk_4iyTtEhqerzzJKsZ75aVWGdyb3FYccGYET....." || !GROQ_API_KEY.startsWith("gsk_")) {
-  console.error("🚨 CRITICAL: Invalid or missing GROQ_API_KEY in background.js!");
-  console.error("Current key:", GROQ_API_KEY);
-  console.error("Please update line 3 with your actual Groq API key from https://console.groq.com/keys");
-}
 
 // Store conversation history per tab
 const conversationHistory = new Map();
@@ -17,6 +8,15 @@ console.log("🔧 Background service worker loaded");
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log("✅ Extension installed successfully");
+  
+  // Check if user has set up their API key
+  chrome.storage.sync.get(['groqApiKey'], (result) => {
+    if (!result.groqApiKey) {
+      console.log("⚠️ No API key found - user needs to set up");
+    } else {
+      console.log("✅ API key found in storage");
+    }
+  });
 });
 
 // Main message handler
@@ -36,6 +36,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   
+  if (request.type === "SAVE_API_KEY") {
+    chrome.storage.sync.set({ groqApiKey: request.apiKey }, () => {
+      console.log("✅ API key saved successfully");
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+  
+  if (request.type === "GET_API_KEY") {
+    chrome.storage.sync.get(['groqApiKey'], (result) => {
+      sendResponse({ apiKey: result.groqApiKey || null });
+    });
+    return true;
+  }
+  
+  if (request.type === "DELETE_API_KEY") {
+    chrome.storage.sync.remove(['groqApiKey'], () => {
+      console.log("🗑️ API key deleted");
+      sendResponse({ success: true });
+    });
+    return true;
+  }
+  
   if (request.type === "PING_BACKGROUND") {
     sendResponse({ status: "ok", message: "Background is active" });
     return true;
@@ -48,127 +71,143 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function handleAIQuery(request, sender, sendResponse) {
   const tabId = sender.tab?.id || "popup";
   
-  // Initialize conversation history for this tab
-  if (!conversationHistory.has(tabId)) {
-    conversationHistory.set(tabId, []);
-  }
-  
-  const history = conversationHistory.get(tabId);
-  const systemPrompt = buildSystemPrompt(request.pageData);
-  
-  // Build messages array
-  const messages = [
-    {
-      role: "system",
-      content: systemPrompt
-    },
-    ...history,
-    {
-      role: "user",
-      content: request.message
-    }
-  ];
-  
-  try {
-    console.log("🤖 Sending request to Groq API...");
-    console.log("📝 User message:", request.message);
-    console.log("🔑 API Key check:", GROQ_API_KEY.substring(0, 10) + "..." + GROQ_API_KEY.substring(GROQ_API_KEY.length - 5));
-    console.log("🔑 Key length:", GROQ_API_KEY.length, "characters");
+  // Get user's API key from storage
+  chrome.storage.sync.get(['groqApiKey'], async (result) => {
+    const userApiKey = result.groqApiKey;
     
-    const response = await fetch(GROQ_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${GROQ_API_KEY}`
+    if (!userApiKey) {
+      sendResponse({ 
+        reply: "⚠️ Please set up your Groq API key first! Click the settings icon in the extension.",
+        success: false,
+        needsSetup: true
+      });
+      return;
+    }
+    
+    // Initialize conversation history for this tab
+    if (!conversationHistory.has(tabId)) {
+      conversationHistory.set(tabId, []);
+    }
+    
+    const history = conversationHistory.get(tabId);
+    const systemPrompt = buildSystemPrompt(request.pageData);
+    
+    // Build messages array
+    const messages = [
+      {
+        role: "system",
+        content: systemPrompt
       },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile", // Fast and smart model
-        messages: messages,
-        max_tokens: 2000, // Increased for detailed answers
-        temperature: 0.7,
-        top_p: 1,
-        stream: false
-      })
-    });
-
-    console.log("📡 Response status:", response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ API Error Response:", errorText);
-      
-      let errorMessage = `API Error ${response.status}`;
-      
-      try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.error?.message || errorMessage;
-      } catch (e) {
-        errorMessage = errorText.substring(0, 200);
-      }
-      
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    console.log("✅ API Response received");
-    
-    let reply = "I apologize, but I couldn't generate a response. Please try again.";
-    let action = null;
-    let target = null;
-    
-    if (data?.choices?.[0]?.message?.content) {
-      const aiResponse = data.choices[0].message.content.trim();
-      console.log("🤖 AI Response:", aiResponse);
-      
-      // Parse AI response for actions
-      const parsedResponse = parseAIResponse(aiResponse, request.pageData);
-      reply = parsedResponse.reply;
-      action = parsedResponse.action;
-      target = parsedResponse.target;
-      
-      // Add to conversation history
-      history.push({
+      ...history,
+      {
         role: "user",
         content: request.message
+      }
+    ];
+    
+    try {
+      console.log("🤖 Sending request to Groq API...");
+      console.log("📝 User message:", request.message);
+      
+      const response = await fetch(GROQ_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${userApiKey}`
+        },
+        body: JSON.stringify({
+          model: "llama-3.3-70b-versatile",
+          messages: messages,
+          max_tokens: 2000,
+          temperature: 0.7,
+          top_p: 1,
+          stream: false
+        })
       });
-      history.push({
-        role: "assistant",
-        content: aiResponse
+
+      console.log("📡 Response status:", response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ API Error Response:", errorText);
+        
+        let errorMessage = `API Error ${response.status}`;
+        
+        if (response.status === 401) {
+          errorMessage = "❌ Invalid API key. Please check your Groq API key in settings.";
+        } else {
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.error?.message || errorMessage;
+          } catch (e) {
+            errorMessage = errorText.substring(0, 200);
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log("✅ API Response received");
+      
+      let reply = "I apologize, but I couldn't generate a response. Please try again.";
+      let action = null;
+      let target = null;
+      
+      if (data?.choices?.[0]?.message?.content) {
+        const aiResponse = data.choices[0].message.content.trim();
+        console.log("🤖 AI Response:", aiResponse);
+        
+        // Parse AI response for actions
+        const parsedResponse = parseAIResponse(aiResponse, request.pageData);
+        reply = parsedResponse.reply;
+        action = parsedResponse.action;
+        target = parsedResponse.target;
+        
+        // Add to conversation history
+        history.push({
+          role: "user",
+          content: request.message
+        });
+        history.push({
+          role: "assistant",
+          content: aiResponse
+        });
+        
+        // Keep history manageable (last 10 exchanges = 20 messages)
+        if (history.length > 20) {
+          history.splice(0, 2);
+        }
+      }
+      
+      sendResponse({ 
+        reply: reply,
+        action: action,
+        target: target,
+        success: true 
       });
       
-      // Keep history manageable (last 10 exchanges = 20 messages)
-      if (history.length > 20) {
-        history.splice(0, 2);
+    } catch (error) {
+      console.error("❌ AI Query Error:", error);
+      
+      let userFriendlyError = "Sorry, I couldn't connect to the AI service.";
+      
+      if (error.message.includes("Invalid API key")) {
+        userFriendlyError = "❌ Invalid API key. Please update your key in settings.";
+      } else if (error.message.includes("API Error 429")) {
+        userFriendlyError = "⏳ Rate limit reached. Please wait a moment and try again.";
+      } else if (error.message.includes("Failed to fetch")) {
+        userFriendlyError = "🌐 Network error. Check your internet connection.";
+      } else {
+        userFriendlyError = `❌ Error: ${error.message}`;
       }
+      
+      sendResponse({ 
+        reply: userFriendlyError,
+        success: false 
+      });
     }
-    
-    sendResponse({ 
-      reply: reply,
-      action: action,
-      target: target,
-      success: true 
-    });
-    
-  } catch (error) {
-    console.error("❌ AI Query Error:", error);
-    
-    let userFriendlyError = "Sorry, I couldn't connect to the AI service.";
-    
-    if (error.message.includes("API Error 401") || error.message.includes("Invalid API Key")) {
-      userFriendlyError = "❌ Invalid API key. Please update GROQ_API_KEY in background.js";
-    } else if (error.message.includes("API Error 429")) {
-      userFriendlyError = "⏳ Rate limit reached. Please wait a moment and try again.";
-    } else if (error.message.includes("Failed to fetch")) {
-      userFriendlyError = "🌐 Network error. Check your internet connection.";
-    } else {
-      userFriendlyError = `❌ Error: ${error.message}`;
-    }
-    
-    sendResponse({ 
-      reply: userFriendlyError,
-      success: false 
-    });
-  }
+  });
 }
 
 // Build system prompt with page context
@@ -208,7 +247,6 @@ PAGE STRUCTURE:
   }
   
   if (pageData.links && pageData.links.length > 0) {
-    // Show important links with their abbreviations
     const importantLinks = pageData.links.slice(0, 30).map(link => {
       if (link.abbreviation) {
         return `"${link.text}" (abbreviation: ${link.abbreviation})`;
@@ -240,12 +278,7 @@ YOUR ROLE:
 3. Guide users to find specific features or information
 4. When users want to navigate somewhere, respond with: NAVIGATE_TO: [exact button or link text]
 5. For questions, provide helpful, conversational answers
-6. **ANSWER GENERAL KNOWLEDGE QUESTIONS** - Use your training knowledge to help with queries about:
-   - Finance, taxes, ITR, investments
-   - Technology, coding, software
-   - Education, careers, courses
-   - Health, science, general topics
-   - Any domain-specific expertise
+6. **ANSWER GENERAL KNOWLEDGE QUESTIONS** - Use your training knowledge to help with queries about finance, taxes, technology, education, health, etc.
 7. Provide detailed, accurate answers when asked complex questions
 
 IMPORTANT INSTRUCTIONS FOR NAVIGATION:
@@ -263,90 +296,11 @@ RESPONSE GUIDELINES:
 - Be conversational and helpful
 - Reference actual elements from the page when relevant
 - Use proper formatting for complex answers (bullet points, numbered lists when appropriate)
-- Cite sources or mention if information is from general knowledge vs. page content
 
 FORM FILLING INSTRUCTIONS:
 - When user wants to fill a form field, use: FILL_FORM: [field_type] = [value]
 - When user wants to submit, use: SUBMIT_FORM
 - To see available form fields, use: GET_FORM_FIELDS
-- Supported field types: email, name, first_name, last_name, phone, password, address, city, zip, message, search
-- Examples:
-  * "Fill in my email" → FILL_FORM: email = user@example.com
-  * "Enter John Doe in name field" → FILL_FORM: name = John Doe
-  * "Submit the form" → SUBMIT_FORM
-
-Examples:
-User: "Click home"
-You: "I'll take you to the home page! NAVIGATE_TO: Home"
-
-User: "What's on this page?"
-You: "This page is ${title}. It has ${linksCount} links and ${buttonsCount} buttons. The main sections include: [list top headings]."
-
-User: "Click on AUMS" (when link says "Amrita University Management System (AUMS)")
-You: "Opening the Amrita University Management System! NAVIGATE_TO: AUMS"
-
-User: "How do I file ITR online?"
-You: "To file your Income Tax Return (ITR) online in India:
-
-1. Visit the Income Tax e-filing portal (incometax.gov.in)
-2. Register/Login with your PAN
-3. Select the appropriate ITR form based on your income sources
-4. Fill in your income details, deductions, and tax paid
-5. Verify using Aadhaar OTP, net banking, or DSC
-6. Submit and download your acknowledgement
-
-Common ITR forms:
-- ITR-1: For salary income up to ₹50 lakh
-- ITR-2: For capital gains, multiple properties
-- ITR-3: For business/professional income
-- ITR-4: For presumptive income
-
-Would you like help finding the ITR portal on this page?"
-
-User: "What is capital gains tax?"
-You: "Capital Gains Tax is the tax on profit from selling capital assets like property, stocks, or mutual funds.
-
-Types:
-1. Short-term Capital Gains (STCG):
-   - Assets held < 1 year (stocks) or < 2 years (property)
-   - Taxed at your income tax slab rate
-   - Exception: Listed equity/equity MFs taxed at 15%
-
-2. Long-term Capital Gains (LTCG):
-   - Assets held > 1 year (stocks) or > 2 years (property)
-   - Listed equity: 10% tax on gains > ₹1 lakh/year
-   - Property: 20% with indexation benefit
-
-Exemptions: Section 54 (property), Section 54EC (bonds)"
-
-User: "What links are available?"
-You: "I can see these main links: [list all important navigation links with their abbreviations]"
-
-User: "Fill in my email with john@example.com"
-You: "I'll fill in your email! FILL_FORM: email = john@example.com"
-
-User: "Tell me about wrestling" (on Wikipedia)
-You: "I can help you learn about wrestling! Let me search for the wrestling article. NAVIGATE_TO: Professional wrestling"
-
-User: "Explain React hooks"
-You: "React Hooks are functions that let you use state and lifecycle features in functional components.
-
-Key hooks:
-1. useState: Manage component state
-   const [count, setCount] = useState(0);
-
-2. useEffect: Handle side effects (API calls, subscriptions)
-   useEffect(() => { fetchData(); }, [dependency]);
-
-3. useContext: Access context values
-4. useReducer: Complex state logic
-5. useMemo: Memoize expensive calculations
-6. useCallback: Memoize functions
-
-Benefits:
-- Cleaner code than class components
-- Better code reuse with custom hooks
-- No 'this' keyword confusion"
 `;
 
   return prompt;
@@ -354,12 +308,10 @@ Benefits:
 
 // Parse AI response to extract actions
 function parseAIResponse(aiResponse, pageData) {
-  // Check if AI wants to navigate
   const navigateMatch = aiResponse.match(/NAVIGATE_TO:\s*(.+?)(?:\n|$)/i);
   
   if (navigateMatch) {
     const target = navigateMatch[1].trim();
-    // Clean up the reply to remove the NAVIGATE_TO command
     const cleanReply = aiResponse.replace(/NAVIGATE_TO:.+/i, '').trim();
     
     return {
@@ -369,7 +321,6 @@ function parseAIResponse(aiResponse, pageData) {
     };
   }
   
-  // Check if AI wants to fill a form field
   const fillFormMatch = aiResponse.match(/FILL_FORM:\s*(.+?)\s*=\s*(.+?)(?:\n|$)/i);
   
   if (fillFormMatch) {
@@ -385,7 +336,6 @@ function parseAIResponse(aiResponse, pageData) {
     };
   }
   
-  // Check if AI wants to submit form
   if (aiResponse.match(/SUBMIT_FORM/i)) {
     const cleanReply = aiResponse.replace(/SUBMIT_FORM/i, '').trim();
     
@@ -395,7 +345,6 @@ function parseAIResponse(aiResponse, pageData) {
     };
   }
   
-  // Check if AI wants to get form fields
   if (aiResponse.match(/GET_FORM_FIELDS/i)) {
     return {
       reply: "Let me check what fields are on this form...",
@@ -403,23 +352,6 @@ function parseAIResponse(aiResponse, pageData) {
     };
   }
   
-  // Check for common navigation phrases in AI response
-  const lowerResponse = aiResponse.toLowerCase();
-  const navPhrases = ['i\'ll take you', 'let me open', 'opening', 'clicking', 'navigating to'];
-  
-  if (navPhrases.some(phrase => lowerResponse.includes(phrase))) {
-    // Try to extract target from quotes or context
-    const quotedMatch = aiResponse.match(/["']([^"']+)["']/);
-    if (quotedMatch) {
-      return {
-        reply: aiResponse,
-        action: "navigate",
-        target: quotedMatch[1]
-      };
-    }
-  }
-  
-  // No action, just return the reply
   return {
     reply: aiResponse,
     action: "explain",
@@ -431,6 +363,4 @@ function parseAIResponse(aiResponse, pageData) {
 chrome.tabs.onRemoved.addListener((tabId) => {
   conversationHistory.delete(tabId);
   console.log("🗑️ Cleaned up history for closed tab:", tabId);
-
 });
-
