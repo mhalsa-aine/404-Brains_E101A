@@ -9,76 +9,76 @@ const errorMsg = document.getElementById('errorMsg');
 
 let isPasswordVisible = false;
 
-console.log("⚙️ Settings page loaded");
+console.log("Settings page loaded");
 
 // Load existing API key when page opens
 chrome.storage.sync.get(['groqApiKey'], (result) => {
-  console.log("📦 Storage result:", result);
+  console.log("Storage result:", result);
   
   if (result.groqApiKey) {
-    console.log("✅ Found existing API key");
+    console.log("Found existing API key");
     apiKeyInput.value = result.groqApiKey;
     deleteBtn.style.display = 'block';
-    showStatus('success', '✅ API Key is configured');
+    showStatus('success', 'API Key is configured');
   } else {
-    console.log("⚠️ No API key found");
-    showStatus('warning', '⚠️ No API Key configured yet');
+    console.log("No API key found");
+    showStatus('warning', 'No API Key configured yet');
   }
 });
 
 // Toggle password visibility
 toggleBtn.addEventListener('click', () => {
-  console.log("👁️ Toggling visibility");
+  console.log("Toggling visibility");
   isPasswordVisible = !isPasswordVisible;
   apiKeyInput.type = isPasswordVisible ? 'text' : 'password';
-  toggleBtn.textContent = isPasswordVisible ? '🙈 Hide Key' : '👁️ Show Key';
+  toggleBtn.textContent = isPasswordVisible ? 'Hide Key' : 'Show Key';
 });
 
 // Save API key
 saveBtn.addEventListener('click', () => {
-  console.log("💾 Save button clicked");
+  console.log("Save button clicked");
   const apiKey = apiKeyInput.value.trim();
   
-  console.log("🔑 API Key length:", apiKey.length);
-  console.log("🔑 Starts with gsk_:", apiKey.startsWith('gsk_'));
+  console.log("API Key length:", apiKey.length);
+  console.log("Starts with gsk_:", apiKey.startsWith('gsk_'));
   
   // Validate API key format
   if (!apiKey) {
-    console.error("❌ Empty API key");
+    console.error("Empty API key");
     showError('Please enter an API key');
     return;
   }
   
   if (!apiKey.startsWith('gsk_')) {
-    console.error("❌ Invalid API key format");
+    console.error("Invalid API key format");
     showError('API key must start with "gsk_"');
     return;
   }
   
   if (apiKey.length < 30) {
-    console.error("❌ API key too short");
+    console.error("API key too short");
     showError('API key appears to be too short');
     return;
   }
 
-  console.log("✅ Validation passed, saving to storage...");
+  console.log("Validation passed, saving to storage...");
   
   // Save to Chrome storage
   chrome.storage.sync.set({ groqApiKey: apiKey }, () => {
     if (chrome.runtime.lastError) {
-      console.error("❌ Storage error:", chrome.runtime.lastError);
+      console.error("Storage error:", chrome.runtime.lastError);
       showError('Failed to save: ' + chrome.runtime.lastError.message);
       return;
     }
     
-    console.log("✅ API key saved successfully!");
+    console.log("API key saved successfully!");
     showSuccess('API Key saved successfully!');
     deleteBtn.style.display = 'block';
-    showStatus('success', '✅ API Key is configured');
+    showStatus('success', 'API Key is configured');
     
     // Auto-redirect back to chat after 1.5 seconds
     setTimeout(() => {
-      console.log("↩️ Redirecting back to chat...");
+      console.log("Redirecting back to chat...");
       window.location.href = 'popup.html';
     }, 1500);
   });
@@ -86,45 +86,46 @@ saveBtn.addEventListener('click', () => {
 
 // Delete API key
 deleteBtn.addEventListener('click', () => {
-  console.log("🗑️ Delete button clicked");
+  console.log("Delete button clicked");
   
   if (confirm('Are you sure you want to delete your API key?')) {
-    console.log("✅ User confirmed deletion");
+    console.log("User confirmed deletion");
     
     chrome.storage.sync.remove(['groqApiKey'], () => {
       if (chrome.runtime.lastError) {
-        console.error("❌ Delete error:", chrome.runtime.lastError);
+        console.error("Delete error:", chrome.runtime.lastError);
         showError('Failed to delete: ' + chrome.runtime.lastError.message);
         return;
       }
       
-      console.log("✅ API key deleted");
+      console.log("API key deleted");
       apiKeyInput.value = '';
       deleteBtn.style.display = 'none';
       showSuccess('API Key deleted');
-      showStatus('warning', '⚠️ No API Key configured yet');
+      showStatus('warning', 'No API Key configured yet');
     });
   } else {
-    console.log("❌ User cancelled deletion");
+    console.log("User cancelled deletion");
   }
 });
 
 // Back button
 backBtn.addEventListener('click', () => {
-  console.log("← Going back to chat");
+  console.log("Going back to chat");
   window.location.href = 'popup.html';
 });
 
 // Helper functions
 function showStatus(type, message) {
-  console.log(`📊 Status: [${type}] ${message}`);
-  statusIndicator.className = `status-indicator ${type}`;
-  statusIndicator.innerHTML = `<span class="icon">${type === 'success' ? '✅' : '⚠️'}</span><span>${message}</span>`;
+  console.log("Status: [" + type + "] " + message);
+  statusIndicator.className = "status-indicator " + type;
+  const icon = type === 'success' ? '✅' : '⚠️';
+  statusIndicator.innerHTML = '<span class="icon">' + icon + '</span><span>' + message + '</span>';
   statusIndicator.style.display = 'flex';
 }
 
 function showSuccess(message) {
-  console.log("✅ Success:", message);
+  console.log("Success:", message);
   successMsg.textContent = '✅ ' + message;
   successMsg.style.display = 'block';
   errorMsg.style.display = 'none';
@@ -134,7 +135,7 @@ function showSuccess(message) {
 }
 
 function showError(message) {
-  console.error("❌ Error:", message);
+  console.error("Error:", message);
   errorMsg.textContent = '❌ ' + message;
   errorMsg.style.display = 'block';
   successMsg.style.display = 'none';
@@ -146,7 +147,7 @@ function showError(message) {
 // Enable save button when input changes
 apiKeyInput.addEventListener('input', () => {
   saveBtn.disabled = !apiKeyInput.value.trim();
-  console.log("✏️ Input changed, save button enabled:", !!apiKeyInput.value.trim());
+  console.log("Input changed, save button enabled:", !!apiKeyInput.value.trim());
 });
 
-console.log("✅ Settings.js initialized");
+console.log("Settings.js initialized");
