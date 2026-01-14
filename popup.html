@@ -30,6 +30,7 @@
       padding: 16px;
       text-align: center;
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      position: relative;
     }
 
     #header h1 {
@@ -46,6 +47,29 @@
       font-size: 12px;
       opacity: 0.9;
       margin-top: 4px;
+    }
+
+    #settings-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      font-size: 20px;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    #settings-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: rotate(90deg);
     }
 
     #status {
@@ -71,6 +95,10 @@
       border-radius: 50%;
       background: #48bb78;
       animation: pulse 2s infinite;
+    }
+
+    .status-dot.warning {
+      background: #f6ad55;
     }
 
     @keyframes pulse {
@@ -177,6 +205,12 @@
       color: #c53030;
     }
 
+    .message.warning {
+      background: #fffaf0;
+      border-color: #f6ad55;
+      color: #c05621;
+    }
+
     .typing-indicator {
       display: flex;
       gap: 4px;
@@ -279,6 +313,7 @@
 <body>
   <div id="chat-container">
     <div id="header">
+      <button id="settings-btn" title="Settings">⚙️</button>
       <h1>
         <span>🤖</span>
         <span>AI Navigation Assistant</span>
@@ -288,7 +323,7 @@
     
     <div id="status">
       <div id="status-left">
-        <span class="status-dot"></span>
+        <span class="status-dot" id="status-dot"></span>
         <span id="status-text">Ready to help you navigate</span>
       </div>
       <button id="clear-btn" title="Clear conversation">🗑️ Clear</button>
