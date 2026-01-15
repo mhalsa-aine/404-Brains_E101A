@@ -45,6 +45,17 @@
     }
     .success { background: #d4edda; }
     .error { background: #f8d7da; }
+    #debug {
+      margin-top: 20px;
+      padding: 10px;
+      background: #000;
+      color: #0f0;
+      font-family: monospace;
+      font-size: 11px;
+      border-radius: 5px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
   </style>
 </head>
 <body>
@@ -52,57 +63,131 @@
     <h2>Settings</h2>
     <div id="msg" class="msg"></div>
     <input type="password" id="key" placeholder="Paste API key (gsk_...)">
-    <button class="save" onclick="save()">Save</button>
-    <button class="delete" id="del" onclick="del()">Delete</button>
-    <button class="back" onclick="back()">Back</button>
+    <button class="save" id="saveBtn">Save</button>
+    <button class="delete" id="delBtn">Delete</button>
+    <button class="back" id="backBtn">Back</button>
     <p style="margin-top:20px; font-size:12px; color:#666;">
       Get free key: <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>
     </p>
+    <div id="debug"></div>
   </div>
 
   <script>
     const keyInput = document.getElementById('key');
-    const delBtn = document.getElementById('del');
+    const delBtn = document.getElementById('delBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const backBtn = document.getElementById('backBtn');
     const msg = document.getElementById('msg');
+    const debug = document.getElementById('debug');
+
+    function log(text) {
+      console.log(text);
+      debug.innerHTML += text + '<br>';
+      debug.scrollTop = debug.scrollHeight;
+    }
+
+    log('=== Settings page loaded ===');
+    log('Chrome storage available: ' + (typeof chrome.storage !== 'undefined'));
 
     // Load key
-    chrome.storage.sync.get(['groqApiKey'], r => {
-      if (r.groqApiKey) {
-        keyInput.value = r.groqApiKey;
+    log('Attempting to load existing key...');
+    chrome.storage.sync.get(['groqApiKey'], function(result) {
+      log('Storage get callback fired');
+      log('Result: ' + JSON.stringify(result));
+      
+      if (result.groqApiKey) {
+        log('Found key, length: ' + result.groqApiKey.length);
+        keyInput.value = result.groqApiKey;
         delBtn.style.display = 'block';
+      } else {
+        log('No existing key found');
       }
     });
 
-    function save() {
+    // Save button
+    saveBtn.addEventListener('click', function() {
+      log('=== SAVE BUTTON CLICKED ===');
       const k = keyInput.value.trim();
-      if (!k || !k.startsWith('gsk_')) {
+      log('Key length: ' + k.length);
+      log('Starts with gsk_: ' + k.startsWith('gsk_'));
+      
+      if (!k) {
+        log('ERROR: Empty key');
+        alert('Please enter a key');
+        return;
+      }
+      
+      if (!k.startsWith('gsk_')) {
+        log('ERROR: Invalid key format');
         alert('Invalid key! Must start with gsk_');
         return;
       }
-      chrome.storage.sync.set({ groqApiKey: k }, () => {
+      
+      log('Validation passed, saving to storage...');
+      
+      chrome.storage.sync.set({ groqApiKey: k }, function() {
+        log('Set callback fired');
+        
+        if (chrome.runtime.lastError) {
+          log('ERROR: ' + chrome.runtime.lastError.message);
+          alert('Save failed: ' + chrome.runtime.lastError.message);
+          return;
+        }
+        
+        log('Save successful!');
         msg.className = 'msg success';
         msg.textContent = 'Saved!';
         msg.style.display = 'block';
         delBtn.style.display = 'block';
-        setTimeout(() => window.location.href = 'popup.html', 1000);
+        
+        log('Attempting redirect in 1 second...');
+        log('Current location: ' + window.location.href);
+        
+        setTimeout(function() {
+          log('Executing redirect NOW');
+          try {
+            window.location.href = 'popup.html';
+            log('Redirect command executed');
+          } catch(e) {
+            log('REDIRECT ERROR: ' + e.message);
+          }
+        }, 1000);
       });
-    }
+    });
 
-    function del() {
-      if (confirm('Delete?')) {
-        chrome.storage.sync.remove(['groqApiKey'], () => {
-          keyInput.value = '';
-          delBtn.style.display = 'none';
-          msg.className = 'msg success';
-          msg.textContent = 'Deleted';
-          msg.style.display = 'block';
-        });
+    // Delete button
+    delBtn.addEventListener('click', function() {
+      log('=== DELETE BUTTON CLICKED ===');
+      if (!confirm('Delete?')) {
+        log('User cancelled');
+        return;
       }
-    }
+      
+      log('Deleting from storage...');
+      chrome.storage.sync.remove(['groqApiKey'], function() {
+        log('Remove callback fired');
+        keyInput.value = '';
+        delBtn.style.display = 'none';
+        msg.className = 'msg success';
+        msg.textContent = 'Deleted';
+        msg.style.display = 'block';
+        log('Delete successful');
+      });
+    });
 
-    function back() {
-      window.location.href = 'popup.html';
-    }
+    // Back button
+    backBtn.addEventListener('click', function() {
+      log('=== BACK BUTTON CLICKED ===');
+      log('Current href: ' + window.location.href);
+      try {
+        window.location.href = 'popup.html';
+        log('Redirect executed');
+      } catch(e) {
+        log('REDIRECT ERROR: ' + e.message);
+      }
+    });
+
+    log('=== Event listeners attached ===');
   </script>
 </body>
-</html
+</html>
