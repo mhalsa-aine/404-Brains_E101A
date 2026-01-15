@@ -2,412 +2,107 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Settings - AI Assistant</title>
+  <title>Settings</title>
   <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       width: 400px;
-      min-height: 500px;
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      padding: 20px;
+      font-family: Arial, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
-
-    .container {
+    .card {
+      background: white;
+      border-radius: 12px;
       padding: 20px;
     }
-
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-    }
-
-    .back-btn {
-      background: rgba(255,255,255,0.2);
-      border: none;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s;
-    }
-
-    .back-btn:hover {
-      background: rgba(255,255,255,0.3);
-    }
-
-    .settings-card {
-      background: white;
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-    }
-
-    h2 {
-      margin: 0 0 8px 0;
-      color: #333;
-      font-size: 24px;
-    }
-
-    .subtitle {
-      color: #666;
-      font-size: 14px;
-      margin-bottom: 24px;
-      line-height: 1.5;
-    }
-
-    .input-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      color: #333;
-      font-weight: 600;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-
-    input[type="password"],
-    input[type="text"] {
+    h2 { margin-bottom: 20px; }
+    input {
       width: 100%;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      font-size: 14px;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ddd;
+      border-radius: 5px;
       font-family: monospace;
-      box-sizing: border-box;
-      transition: border-color 0.2s;
     }
-
-    input:focus {
-      outline: none;
-      border-color: #667eea;
-    }
-
-    .input-hint {
-      font-size: 12px;
-      color: #999;
-      margin-top: 6px;
-    }
-
-    .status-indicator {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 14px;
-    }
-
-    .status-indicator.success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-
-    .status-indicator.warning {
-      background: #fff3cd;
-      color: #856404;
-      border: 1px solid #ffeeba;
-    }
-
-    .status-indicator .icon {
-      font-size: 18px;
-    }
-
-    .btn-group {
-      display: flex;
-      gap: 12px;
-      margin-top: 24px;
-    }
-
     button {
-      flex: 1;
-      padding: 12px 24px;
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
       border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
+      border-radius: 5px;
       cursor: pointer;
-      transition: all 0.2s;
+      font-weight: bold;
     }
-
-    .save-btn {
-      background: #667eea;
-      color: white;
-    }
-
-    .save-btn:hover {
-      background: #5568d3;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-
-    .save-btn:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .delete-btn {
-      background: #ff4757;
-      color: white;
-    }
-
-    .delete-btn:hover {
-      background: #ee5a6f;
-    }
-
-    .toggle-visibility {
-      background: #f0f0f0;
-      color: #333;
-      padding: 8px 16px;
-      margin-top: 8px;
-      font-size: 13px;
-    }
-
-    .toggle-visibility:hover {
-      background: #e0e0e0;
-    }
-
-    .instructions {
-      background: #f8f9fa;
-      border-left: 4px solid #667eea;
-      padding: 16px;
-      border-radius: 8px;
-      margin-top: 24px;
-    }
-
-    .instructions h3 {
-      margin: 0 0 12px 0;
-      color: #333;
-      font-size: 16px;
-    }
-
-    .instructions ol {
-      margin: 0;
-      padding-left: 20px;
-      color: #555;
-      font-size: 14px;
-      line-height: 1.8;
-    }
-
-    .instructions a {
-      color: #667eea;
-      text-decoration: none;
-      font-weight: 600;
-    }
-
-    .instructions a:hover {
-      text-decoration: underline;
-    }
-
-    .success-message {
-      background: #d4edda;
-      color: #155724;
-      padding: 12px;
-      border-radius: 8px;
-      margin-top: 16px;
-      text-align: center;
-      font-weight: 600;
+    .save { background: #667eea; color: white; }
+    .back { background: #ddd; }
+    .delete { background: #ff4757; color: white; display: none; }
+    .msg {
+      padding: 10px;
+      border-radius: 5px;
+      margin-bottom: 10px;
       display: none;
     }
-
-    .error-message {
-      background: #f8d7da;
-      color: #721c24;
-      padding: 12px;
-      border-radius: 8px;
-      margin-top: 16px;
-      text-align: center;
-      font-weight: 600;
-      display: none;
-    }
+    .success { background: #d4edda; }
+    .error { background: #f8d7da; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1 style="color: white; margin: 0; font-size: 20px;">⚙️ Settings</h1>
-      <button class="back-btn" id="backBtn">← Back to Chat</button>
-    </div>
-
-    <div class="settings-card">
-      <h2>🔑 Groq API Key</h2>
-      <p class="subtitle">Your API key is stored locally and never shared. Get your free key from Groq.</p>
-
-      <div id="statusIndicator" style="display: none;"></div>
-
-      <div class="input-group">
-        <label for="apiKeyInput">API Key</label>
-        <input 
-          type="password" 
-          id="apiKeyInput" 
-          placeholder="gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-          spellcheck="false"
-        >
-        <div class="input-hint">Your key should start with "gsk_"</div>
-        <button class="toggle-visibility" id="toggleBtn">👁️ Show Key</button>
-      </div>
-
-      <div class="btn-group">
-        <button class="save-btn" id="saveBtn">💾 Save Key</button>
-        <button class="delete-btn" id="deleteBtn" style="display: none;">🗑️ Delete Key</button>
-      </div>
-
-      <div class="success-message" id="successMsg">✅ API Key saved successfully!</div>
-      <div class="error-message" id="errorMsg">❌ Please enter a valid API key</div>
-
-      <div class="instructions">
-        <h3>📝 How to get your free Groq API Key:</h3>
-        <ol>
-          <li>Visit <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a></li>
-          <li>Sign up or log in (free account)</li>
-          <li>Click "Create API Key"</li>
-          <li>Copy the key and paste it above</li>
-          <li>Click "Save Key" and start chatting!</li>
-        </ol>
-      </div>
-    </div>
+  <div class="card">
+    <h2>Settings</h2>
+    <div id="msg" class="msg"></div>
+    <input type="password" id="key" placeholder="Paste API key (gsk_...)">
+    <button class="save" onclick="save()">Save</button>
+    <button class="delete" id="del" onclick="del()">Delete</button>
+    <button class="back" onclick="back()">Back</button>
+    <p style="margin-top:20px; font-size:12px; color:#666;">
+      Get free key: <a href="https://console.groq.com/keys" target="_blank">console.groq.com/keys</a>
+    </p>
   </div>
 
   <script>
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const saveBtn = document.getElementById('saveBtn');
-    const deleteBtn = document.getElementById('deleteBtn');
-    const toggleBtn = document.getElementById('toggleBtn');
-    const backBtn = document.getElementById('backBtn');
-    const statusIndicator = document.getElementById('statusIndicator');
-    const successMsg = document.getElementById('successMsg');
-    const errorMsg = document.getElementById('errorMsg');
+    const keyInput = document.getElementById('key');
+    const delBtn = document.getElementById('del');
+    const msg = document.getElementById('msg');
 
-    let isPasswordVisible = false;
-
-    console.log("Settings page loaded");
-
-    // Load existing API key
-    chrome.runtime.sendMessage({ type: 'GET_API_KEY' }, (response) => {
-      console.log("API key check:", response);
-      if (response && response.apiKey) {
-        apiKeyInput.value = response.apiKey;
-        deleteBtn.style.display = 'block';
-        showStatus('success', '✅ API Key is configured');
-      } else {
-        showStatus('warning', '⚠️ No API Key configured yet');
+    // Load key
+    chrome.storage.sync.get(['groqApiKey'], r => {
+      if (r.groqApiKey) {
+        keyInput.value = r.groqApiKey;
+        delBtn.style.display = 'block';
       }
     });
 
-    // Toggle password visibility
-    toggleBtn.addEventListener('click', () => {
-      isPasswordVisible = !isPasswordVisible;
-      apiKeyInput.type = isPasswordVisible ? 'text' : 'password';
-      toggleBtn.textContent = isPasswordVisible ? '🙈 Hide Key' : '👁️ Show Key';
-    });
-
-    // Save API key
-    saveBtn.addEventListener('click', () => {
-      const apiKey = apiKeyInput.value.trim();
-      
-      console.log("Saving API key, length:", apiKey.length);
-      
-      // Validate API key format
-      if (!apiKey) {
-        showError('Please enter an API key');
+    function save() {
+      const k = keyInput.value.trim();
+      if (!k || !k.startsWith('gsk_')) {
+        alert('Invalid key! Must start with gsk_');
         return;
       }
-      
-      if (!apiKey.startsWith('gsk_')) {
-        showError('API key must start with "gsk_"');
-        return;
-      }
-      
-      if (apiKey.length < 30) {
-        showError('API key appears to be invalid');
-        return;
-      }
+      chrome.storage.sync.set({ groqApiKey: k }, () => {
+        msg.className = 'msg success';
+        msg.textContent = 'Saved!';
+        msg.style.display = 'block';
+        delBtn.style.display = 'block';
+        setTimeout(() => window.location.href = 'popup.html', 1000);
+      });
+    }
 
-      console.log("Sending save request to background...");
-
-      chrome.runtime.sendMessage(
-        { type: 'SAVE_API_KEY', apiKey: apiKey },
-        (response) => {
-          console.log("Save response:", response);
-          if (response && response.success) {
-            showSuccess('API Key saved successfully!');
-            deleteBtn.style.display = 'block';
-            showStatus('success', '✅ API Key is configured');
-            
-            // Auto-redirect back to chat after 1.5 seconds
-            setTimeout(() => {
-              console.log("Redirecting to popup...");
-              window.location.href = 'popup.html';
-            }, 1500);
-          } else {
-            showError('Failed to save API key');
-          }
-        }
-      );
-    });
-
-    // Delete API key
-    deleteBtn.addEventListener('click', () => {
-      if (confirm('Are you sure you want to delete your API key?')) {
-        console.log("Deleting API key...");
-        chrome.runtime.sendMessage({ type: 'DELETE_API_KEY' }, (response) => {
-          console.log("Delete response:", response);
-          if (response && response.success) {
-            apiKeyInput.value = '';
-            deleteBtn.style.display = 'none';
-            showSuccess('API Key deleted');
-            showStatus('warning', '⚠️ No API Key configured yet');
-          }
+    function del() {
+      if (confirm('Delete?')) {
+        chrome.storage.sync.remove(['groqApiKey'], () => {
+          keyInput.value = '';
+          delBtn.style.display = 'none';
+          msg.className = 'msg success';
+          msg.textContent = 'Deleted';
+          msg.style.display = 'block';
         });
       }
-    });
+    }
 
-    // Back button - ACTUALLY WORKS NOW
-    backBtn.addEventListener('click', () => {
-      console.log("Going back to chat...");
+    function back() {
       window.location.href = 'popup.html';
-    });
-
-    // Helper functions
-    function showStatus(type, message) {
-      statusIndicator.className = 'status-indicator ' + type;
-      statusIndicator.innerHTML = '<span class="icon">' + (type === 'success' ? '✅' : '⚠️') + '</span><span>' + message + '</span>';
-      statusIndicator.style.display = 'flex';
     }
-
-    function showSuccess(message) {
-      console.log("Success:", message);
-      successMsg.textContent = '✅ ' + message;
-      successMsg.style.display = 'block';
-      errorMsg.style.display = 'none';
-      setTimeout(() => {
-        successMsg.style.display = 'none';
-      }, 3000);
-    }
-
-    function showError(message) {
-      console.error("Error:", message);
-      errorMsg.textContent = '❌ ' + message;
-      errorMsg.style.display = 'block';
-      successMsg.style.display = 'none';
-      setTimeout(() => {
-        errorMsg.style.display = 'none';
-      }, 3000);
-    }
-
-    // Enable save button when input changes
-    apiKeyInput.addEventListener('input', () => {
-      saveBtn.disabled = !apiKeyInput.value.trim();
-    });
-
-    console.log("Settings initialized");
   </script>
 </body>
-</html>
+</html
